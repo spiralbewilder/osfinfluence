@@ -121,6 +121,23 @@ const FALLBACK_SECTOR_RULES = [
 
 const SECTOR_RULES = [...PRIMARY_SECTOR_RULES, ...FALLBACK_SECTOR_RULES, { label: OTHER_LABEL, color: '#8888ff', regex: /.*/ }];
 
+const MEDIA_OVERRIDE_NAMES = new Set([
+  'stichting lighthouse reports',
+  'arena for journalism in europe',
+  'the bureau of investigative journalism',
+  'global forum for media development aisbl',
+  'reporters without borders',
+  'investigative reporting project italy',
+  'media legal defence initiative',
+  'media monitoring africa trust',
+  'journalism development network',
+  'red en defensa de los derechos digitales ac',
+  'agencia mural de jornalismo das periferias'
+]);
+
+const MEDIA_NAME_TOKENS = [/media\b/, /press\b/, /news(?!letter)/, /journal(ism|ist)?/, /radio/, /tv\b/, /tele(vision)?/, /broadcast/, /investigative/, /report(er|ing)?/, /digital rights/, /information access/];
+const MEDIA_PURPOSE_TOKENS = [/media/, /journalis/, /press/, /news/, /investigative/, /broadcast/, /radio/, /tv\b/, /television/, /documentary/, /podcast/, /digital rights/, /freedom of expression/, /information access/];
+
 const countryNameMap = {
   US: 'United States', USA: 'United States',
   GB: 'United Kingdom', UK: 'United Kingdom', GBR: 'United Kingdom',
@@ -184,12 +201,38 @@ async function getCoords(loc) {
   }
 }
 
+async function resolveGeocode(queries = [], countryFull = 'United States') {
+  for (const q of queries) {
+    if (!q) continue;
+    const coords = await getCoords(q);
+    if (coords) return coords;
+  }
+  const fallback = countryFallback[countryFull];
+  if (fallback) return { lat: fallback[0], lng: fallback[1] };
+  return { lat: 39.8, lng: -98.5 };
+}
+
 function sectorColor(label) {
   return (SECTOR_RULES.find(r => r.label === label) || SECTOR_RULES[SECTOR_RULES.length - 1]).color;
 }
 
 function titleCase(str = '') {
   return str.toLowerCase().replace(/\b([a-z])/g, s => s.toUpperCase());
+}
+
+function applyMediaBias(name = '', purpose = '', sectors) {
+  const nameKey = name.trim().toLowerCase();
+  const lowerPurpose = (purpose || '').toLowerCase();
+  const mediaNameMatch = MEDIA_OVERRIDE_NAMES.has(nameKey) || MEDIA_NAME_TOKENS.some(re => re.test(nameKey));
+  const mediaPurposeMatch = MEDIA_PURPOSE_TOKENS.some(re => re.test(lowerPurpose));
+
+  if (mediaNameMatch || mediaPurposeMatch) {
+    if (sectors.primary === 'Media & Journalism') return sectors;
+    const secondary = sectors.primary && sectors.primary !== 'Media & Journalism' ? sectors.primary : sectors.secondary;
+    return { primary: 'Media & Journalism', secondary: secondary || sectors.secondary || OTHER_LABEL };
+  }
+
+  return sectors;
 }
 
 function categorizeSectors(purpose = '') {
@@ -234,18 +277,28 @@ function amountBand(amount) {
 function buildLocation(row, yearHint) {
   const cityRaw = row.recipient_city?.trim() || '';
   const city = cityRaw ? titleCase(cityRaw) : '';
-  const state = row.recipient_state?.trim() || '';
+  const stateRaw = row.recipient_state?.trim() || '';
+  const state = stateRaw ? titleCase(stateRaw) : '';
   const countryRaw = (row.recipient_country?.trim() || 'US').toUpperCase();
   const countryFull = countryNameMap[countryRaw] || countryRaw;
-  const loc = countryRaw === 'US'
-    ? (city && state ? `${city}, ${state}, United States` : city ? `${city}, United States` : 'United States')
-    : (city ? `${city}, ${countryFull}` : countryFull);
+  const parts = [];
+  if (city) parts.push(city);
+  if (state) parts.push(state);
+  parts.push(countryRaw === 'US' ? 'United States' : countryFull);
+  const loc = parts.filter(Boolean).join(', ');
+  const geocodeQueries = [];
+  if (city && state) geocodeQueries.push(`${city}, ${state}, ${countryFull}`);
+  if (city && !state) geocodeQueries.push(`${city}, ${countryFull}`);
+  if (!city && state) geocodeQueries.push(`${state}, ${countryFull}`);
+  geocodeQueries.push(countryFull);
   const year = Number(row.tax_year || yearHint) || yearHint;
   return {
     loc,
     countryFull,
     country_code: countryRaw.length === 3 ? countryRaw : countryRaw.slice(0, 3),
     city_normalized: city,
+    state_normalized: state,
+    geocodeQueries,
     region: regionMap[countryFull] || 'Other',
     domestic_foreign: countryRaw === 'US' ? 'Domestic' : 'Foreign',
     year
@@ -267,8 +320,8 @@ async function loadGrantData() {
       Papa.parse(text, {header: true, skipEmptyLines: true}).data.forEach(row => {
         const amount = +row.amount;
         if (!Number.isFinite(amount) || amount <= 0) return;
-        const { loc, countryFull, country_code, city_normalized, region, domestic_foreign, year: parsedYear } = buildLocation(row, year);
-        const sectors = categorizeSectors(row.purpose || '');
+        const { loc, countryFull, country_code, city_normalized, state_normalized, geocodeQueries, region, domestic_foreign, year: parsedYear } = buildLocation(row, year);
+        const sectors = applyMediaBias(row.recipient_name || '', row.purpose || '', categorizeSectors(row.purpose || ''));
         const { recipient_type, recipient_role } = recipientTypeRole(row.recipient_name || '', row.purpose || '');
         grants.push({
           loc,
@@ -277,6 +330,8 @@ async function loadGrantData() {
           region,
           domestic_foreign,
           city_normalized,
+          state_normalized,
+          geocodeQueries,
           hasCity: !!city_normalized,
           name: row.recipient_name || 'Anon',
           amount,
@@ -393,9 +448,6 @@ function renderPoints(maxYear) {
     return;
   }
 
-  const uniqueLocs = [...new Set(grants.map(g => g.loc))];
-  await Promise.all(uniqueLocs.map(getCoords));
-
   globe = Globe()
     .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
     .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
@@ -425,15 +477,15 @@ function renderPoints(maxYear) {
     })
     (document.getElementById('globeViz'));
 
-  allPoints = grants.map(g => {
-    const coord = cache[g.loc] || (countryFallback[g.countryFull] ? {lat: countryFallback[g.countryFull][0], lng: countryFallback[g.countryFull][1]} : {lat:39.8, lng:-98.5});
+  allPoints = await Promise.all(grants.map(async g => {
+    const coord = await resolveGeocode(g.geocodeQueries, g.countryFull);
     const jittered = jitteredPoint(coord, g.hasCity);
     return {
       ...g,
       lat: jittered.lat,
       lng: jittered.lng
     };
-  });
+  }));
 
   const filtersContainer = document.getElementById('sectorFilters');
   SECTOR_RULES.forEach(rule => {
