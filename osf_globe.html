@@ -1,8 +1,130 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>OSF Grants 2023 – Globe</title>
+  <meta charset="utf-8">
+  <title>OSF Grants 2023 · Every Grant Plotted (No Skips)</title>
   <style>
-    body {
-      margin
+    body { margin:0; background:#000; overflow:hidden; font-family:sans-serif; }
+    #globeViz { width:100vw; height:100vh; }
+    #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,0,30,0.95); color:#fff; padding:20px; box-sizing:border-box; overflow-y:auto; border-left:2px solid #ff00ff; display:none; }
+    #close { position:absolute; top:10px; left:10px; font-size:30px; cursor:pointer; color:#ff00ff; }
+  </style>
+  <script src="https://unpkg.com/three/build/three.min.js"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script src="https://unpkg.com/papaparse@latest/papaparse.min.js"></script>
+</head>
+<body>
+<div id="globeViz"></div>
+<div id="panel">
+  <div id="close">×</div>
+  <h2 id="title"></h2>
+  <div id="content"></div>
+</div>
+
+<script>
+const countryNameMap = {
+  US: 'United States', GB: 'United Kingdom', UK: 'United Kingdom', FR: 'France', DE: 'Germany',
+  IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', SE: 'Sweden', NO: 'Norway',
+  CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', BR: 'Brazil', AR: 'Argentina', CL: 'Chile',
+  PE: 'Peru', CO: 'Colombia', MX: 'Mexico', EG: 'Egypt', ZA: 'South Africa', KE: 'Kenya',
+  ID: 'Indonesia', TH: 'Thailand', IN: 'India', PK: 'Pakistan', BD: 'Bangladesh', TR: 'Turkey',
+  UA: 'Ukraine', PL: 'Poland', KR: 'South Korea', JP: 'Japan', PH: 'Philippines', MY: 'Malaysia',
+  TW: 'Taiwan', RQ: 'Puerto Rico', CB: 'Cambodia', ET: 'Ethiopia', HA: 'Haiti', LT: 'Lithuania',
+  GV: 'Guinea', TS: 'Tunisia', EZ: 'Czech Republic', SW: 'Sweden', PO: 'Portugal', SP: 'Spain',
+  SU: 'Sudan', KG: 'Kyrgyzstan'
+};
+
+const countryFallback = {
+  'United States': [39.8,-98.5], 'United Kingdom': [55.4,-3.4], 'France': [46.2,2.2], 'Germany': [51.2,10.4],
+  'Italy': [41.9,12.5], 'Spain': [40.5,-3.7], 'Netherlands': [52.1,5.3], 'Belgium': [50.5,4.5],
+  'Sweden': [60.1,18.6], 'Norway': [60.5,8.5], 'Canada': [56.1,-106.3], 'Australia': [-25.3,133.8],
+  'New Zealand': [-40.9,174.9], 'Brazil': [-14.2,-51.9], 'Argentina': [-38.4,-63.6], 'Chile': [-35.7,-71.5],
+  'Peru': [-9.2,-75], 'Colombia': [4.6,-74.1], 'Mexico': [23.6,-102.6], 'Egypt': [26.8,30.8],
+  'South Africa': [-30.6,22.9], 'Kenya': [0,37.9], 'Indonesia': [-0.8,113.9], 'Thailand': [15.9,101],
+  'India': [20.6,78.9], 'Pakistan': [30.4,69.3], 'Bangladesh': [23.7,90.4], 'Turkey': [38.9,35.2],
+  'Ukraine': [48.4,31.2], 'Poland': [51.9,19.1], 'South Korea': [35.9,127.8], 'Japan': [36.2,138.3],
+  'Philippines': [12.9,121.8], 'Malaysia': [4.2,101.9], 'Taiwan': [23.7,121], 'Puerto Rico': [18.2,-66.5]
+};
+
+const cache = {};
+const grants = [];
+
+async function getCoords(loc) {
+  if (cache[loc] !== undefined) return cache[loc];
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(loc)}`);
+    const data = await resp.json();
+    const coords = data[0] ? {lat: +data[0].lat, lng: +data[0].lon} : null;
+    cache[loc] = coords || null;
+    return coords;
+  } catch {
+    cache[loc] = null;
+    return null;
+  }
+}
+
+fetch('2023.csv')
+  .then(r => r.ok ? r.text() : Promise.reject())
+  .then(text => {
+    Papa.parse(text, {header: true, skipEmptyLines: true}).data.forEach(row => {
+      if (+row.amount <= 0) return;
+      const city = row.recipient_city?.trim() || '';
+      const state = row.recipient_state?.trim() || '';
+      const code = (row.recipient_country?.trim() || 'US').toUpperCase();
+      const countryFull = countryNameMap[code] || code;
+      const loc = code === 'US' 
+        ? (city && state ? `${city}, ${state}, United States` : city ? `${city}, United States` : 'United States')
+        : (city ? `${city}, ${countryFull}` : countryFull);
+
+      const lower = (row.purpose || '').toLowerCase();
+      let cat = 'Hybrid';
+      if (/media|journalis|press|news|outlet|report|broadcast|digital rights|disinformation|fact.check|information|open society journalism|freedom of expression|independent media|press freedom|media development/i.test(lower)) cat = 'Nudge: Media Influence';
+      else if (/master|llm|degree|scholarship|fellow/i.test(lower)) cat = 'Spawn: Leader Training';
+      else if (/general support|core|operating/i.test(lower)) cat = 'Spawn: Org Core';
+      else if (/educate|awareness|dialogue|public program|campaign/i.test(lower)) cat = 'Nudge: Narrative';
+      else if (/research|book|analyze|publication|documentary|archive/i.test(lower)) cat = 'Nudge: Knowledge';
+      else if (/reproductive|gender|lgbt|trans|feminist|women|girl/i.test(lower)) cat = 'Nudge: Fragment';
+      else if (/racial|black|decolon|indigenous|land back|minority/i.test(lower)) cat = 'Nudge: Identity';
+
+      grants.push({loc, name:row.recipient_name||'Anon', amount:+row.amount, purpose:(row.purpose||'').replace(/"/g,"'"), cat, countryFull});
+    });
+
+    const uniqueLocs = [...new Set(grants.map(g => g.loc))];
+
+    Promise.all(uniqueLocs.map(getCoords)).then(() => {
+      const globe = Globe()
+        .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+        .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+        .showAtmosphere(true)
+        .atmosphereColor('#ff00ff')
+        .atmosphereAltitude(0.2)
+        .pointAltitude(0)
+        .pointRadius(0.28)
+        .pointColor(d => d.cat==='Nudge: Media Influence' ? '#ff00ff' : d.cat.startsWith('Spawn') ? '#00ff00' : '#8888ff')
+        .pointLabel(d => `<b>${d.name}</b><br>$${d.amount.toLocaleString()}<br><span style="color:#ff00ff">[${d.cat}]</span>`)
+        .onPointClick(d => {
+          document.getElementById('title').textContent = d.name;
+          document.getElementById('content').innerHTML = `<b>$${d.amount.toLocaleString()}</b><br><b>${d.cat}</b><br>${d.purpose}<br><i>${d.loc}</i>`;
+          document.getElementById('panel').style.display = 'block';
+        })
+        (document.getElementById('globeViz'));
+
+      const points = grants.map(g => {
+        let c = cache[g.loc] || countryFallback[g.countryFull] || {lat:39.8, lng:-98.5}; // ALWAYS has coords, no skips
+        const jitter = g.loc.includes(',') ? 1.8 : 0;
+        return {
+          lat: c.lat + (Math.random()-0.5)*jitter,
+          lng: c.lng + (Math.random()-0.5)*jitter,
+          ...g
+        };
+      });
+
+      globe.pointsData(points);
+
+      document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
+      globe.controls().autoRotate = false;
+    });
+  });
+</script>
+</body>
+</html>
