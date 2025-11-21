@@ -2,12 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>OSF Grants 2023 · Every Grant Plotted (No Skips)</title>
+  <title>OSF Grants Globe · Every Grant Plotted (No Skips)</title>
   <style>
-    body { margin:0; background:#000; overflow:hidden; font-family:sans-serif; }
+    :root {
+      --magenta: #ff00ff;
+      --green: #00ff00;
+      --hybrid: #8888ff;
+      --bg: #050010;
+    }
+    body { margin:0; background:var(--bg); overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
     #globeViz { width:100vw; height:100vh; }
-    #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,0,30,0.95); color:#fff; padding:20px; box-sizing:border-box; overflow-y:auto; border-left:2px solid #ff00ff; display:none; }
-    #close { position:absolute; top:10px; left:10px; font-size:30px; cursor:pointer; color:#ff00ff; }
+    #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,0,30,0.95); color:#fff; padding:24px; box-sizing:border-box; overflow-y:auto; border-left:2px solid var(--magenta); display:none; box-shadow:-10px 0 30px rgba(255,0,255,0.25); }
+    #close { position:absolute; top:12px; left:12px; font-size:28px; cursor:pointer; color:var(--magenta); font-weight:bold; }
+    #title { margin:32px 0 6px; font-size:26px; letter-spacing:0.5px; }
+    #content { line-height:1.5; font-size:14px; color:#e5e5ff; }
+    .panel-amount { font-size:24px; margin:6px 0; color:#fff; font-weight:700; }
+    .panel-year { font-size:16px; color:#9ac7ff; margin-bottom:6px; }
+    .panel-purpose { margin:12px 0; }
+    .chip { display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; letter-spacing:0.2px; text-transform:uppercase; font-weight:700; margin-bottom:10px; }
+    .location { font-style:italic; color:#c9c9ff; }
+    #controls { position:absolute; top:16px; left:16px; padding:12px 14px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); }
+    #yearLabel { margin-bottom:8px; display:block; font-weight:700; letter-spacing:0.3px; color:#c2c8ff; }
+    #yearSlider { width:260px; accent-color:var(--magenta); }
+    #fileWarning { position:fixed; inset:0; background:rgba(5,0,16,0.96); color:#fff; display:none; align-items:center; justify-content:center; text-align:left; padding:48px; box-sizing:border-box; z-index:10; }
+    #fileWarning .box { max-width:720px; border:1px solid rgba(255,0,255,0.35); background:rgba(20,0,40,0.85); box-shadow:0 0 30px rgba(0,255,255,0.25); padding:28px; border-radius:12px; }
+    #fileWarning h1 { margin-top:0; margin-bottom:12px; font-size:26px; color:#ff7bff; }
+    #fileWarning ol { margin:12px 0; padding-left:20px; }
+    #fileWarning code { background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:6px; }
   </style>
   <script src="https://unpkg.com/three/build/three.min.js"></script>
   <script src="https://unpkg.com/globe.gl"></script>
@@ -15,6 +36,31 @@
 </head>
 <body>
 <div id="globeViz"></div>
+<div id="controls">
+  <label id="yearLabel" for="yearSlider">Loading data…</label>
+  <input id="yearSlider" type="range" min="2016" max="2025" step="1" value="2016" />
+  <div style="margin-top:10px; color:#c2c8ff; font-size:13px;">
+    <div style="margin-bottom:6px; font-weight:700;">Bubble size</div>
+    <label style="margin-right:8px;"><input type="radio" name="sizeMode" value="amount" checked /> total amount</label>
+    <label><input type="radio" name="sizeMode" value="count" /> grant count</label>
+  </div>
+  <div style="margin-top:12px; color:#c2c8ff; font-size:13px;">
+    <div style="margin-bottom:6px; font-weight:700;">Sectors</div>
+    <div id="sectorFilters" style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px;"></div>
+  </div>
+</div>
+<div id="fileWarning">
+  <div class="box">
+    <h1>Serve this page over HTTP/HTTPS</h1>
+    <p id="fileMessage">Your browser is blocking local <code>file://</code> access, so CSVs cannot load. Please serve the folder with a simple server, then open the page via <code>http://</code> or <code>https://</code>.</p>
+    <ol>
+      <li>Open a terminal in this folder.</li>
+      <li>Run <code>python -m http.server 8000</code> (or any static server).</li>
+      <li>Navigate to <code>http://localhost:8000/osf_globe.html</code>.</li>
+    </ol>
+    <p>This prevents the CORS error you saw when opening the file directly.</p>
+  </div>
+</div>
 <div id="panel">
   <div id="close">×</div>
   <h2 id="title"></h2>
@@ -22,16 +68,86 @@
 </div>
 
 <script>
+const OTHER_LABEL = 'Other / Unclear';
+const isFileProtocol = window.location.protocol === 'file:';
+
+function showFileWarning(message) {
+  const warning = document.getElementById('fileWarning');
+  const msg = document.getElementById('fileMessage');
+  if (msg && message) msg.textContent = message;
+  if (warning) warning.style.display = 'flex';
+  const controls = document.getElementById('controls');
+  if (controls) controls.style.display = 'none';
+}
+
+if (isFileProtocol) {
+  // Stop network attempts entirely when opened via file:// and surface guidance immediately.
+  window.fetch = async (...args) => {
+    console.warn('Blocked fetch under file://. Args:', args);
+    throw new Error('CSV fetch blocked under file://. Serve over HTTP/HTTPS.');
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('yearLabel').textContent = 'Please open via http:// or https:// — browsers block local file access.';
+    showFileWarning('CSV fetches are blocked when opening via file://. Serve the folder (e.g., python -m http.server 8000) and reopen via http:// or https://.');
+  });
+  window.addEventListener('unhandledrejection', () => {
+    showFileWarning('CSV fetches are blocked under file://. Serve this folder with python -m http.server 8000 and reload via http://localhost:8000/.');
+  });
+} else {
+
+const PRIMARY_SECTOR_RULES = [
+  { label: 'Education & Scholarships', color: '#00eaff', regex: /master|graduate|degree|scholarship|fellow(ship)?|study|training/ },
+  { label: 'Academic & Policy Research', color: '#9d7bff', regex: /research|study|book|report|analysis|thesis/ },
+  { label: 'Media & Journalism', color: '#ff00ff', regex: /journalist|report(ing)?|news(room)?|media|documentary|podcast|investigation/ },
+  { label: 'Civil Society & Activism', color: '#00ff9d', regex: /community organizing|advocacy|movement|grassroots|campaign|civic engagement/ },
+  { label: 'Law, Justice & Rights', color: '#ffa200', regex: /court|litigation|\bllm\b|legal aid|human rights|rule of law/ },
+  { label: 'Governance & Democracy', color: '#ff5f5f', regex: /election|transparency|anti[- ]?corruption|governance|public policy/ },
+  { label: 'Arts & Culture', color: '#ff80d5', regex: /artist|festival|theatre|cinema|culture|exhibition/ },
+  { label: 'Tech, Data & Information', color: '#00ffde', regex: /digital|platform|online|cyber|data|\bai\b|misinformation|social media/ },
+  { label: 'Health & Social Services', color: '#7cff00', regex: /health|mental health|harm reduction|social services|welfare/ }
+];
+
+// Fallback ontology applied only after primary sector matches are checked to avoid overriding
+// Media & Journalism or other primary sectors.
+const FALLBACK_SECTOR_RULES = [
+  { label: 'Other: Cross-cutting capacity & ops', color: '#8888ff', regex: /infrastructure|platform maintenance|tooling|internal systems|operations|finance|accounting|hr\b|compliance|audit|security|risk management|data stewardship/ },
+  { label: 'Other: Philanthropy & field support', color: '#8888ff', regex: /regranting|intermediary|donor collaborative|pooled fund|fiscal sponsorship|landscape scan|field mapping|ecosystem support|technical assistance|technical support|\bta\b/ },
+  { label: 'Other: Convenings & networks', color: '#8888ff', regex: /conference|convening|summit|forum|workshop series|network|cohort|alliance|consortium|community of practice/ },
+  { label: 'Other: Cross-sector innovation & pilots', color: '#8888ff', regex: /pilot|prototype|innovation|lab|experiment|incubator|accelerator|sandbox|cross-sector|multi[- ]?stakeholder/ },
+  { label: 'Other: Emergency & relief', color: '#8888ff', regex: /emergency|relief|rapid response|contingency|crisis|disaster|humanitarian|urgent support/ },
+  { label: 'Other: Administration-only', color: '#8888ff', regex: /rent|utilities|office equipment|administration|bookkeeping|payroll|insurance|registration fee/ },
+  { label: 'Other: Unclassifiable / insufficient detail', color: '#8888ff', regex: /.*/ }
+];
+
+const SECTOR_RULES = [...PRIMARY_SECTOR_RULES, ...FALLBACK_SECTOR_RULES, { label: OTHER_LABEL, color: '#8888ff', regex: /.*/ }];
+
 const countryNameMap = {
-  US: 'United States', GB: 'United Kingdom', UK: 'United Kingdom', FR: 'France', DE: 'Germany',
-  IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', SE: 'Sweden', NO: 'Norway',
-  CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', BR: 'Brazil', AR: 'Argentina', CL: 'Chile',
-  PE: 'Peru', CO: 'Colombia', MX: 'Mexico', EG: 'Egypt', ZA: 'South Africa', KE: 'Kenya',
-  ID: 'Indonesia', TH: 'Thailand', IN: 'India', PK: 'Pakistan', BD: 'Bangladesh', TR: 'Turkey',
-  UA: 'Ukraine', PL: 'Poland', KR: 'South Korea', JP: 'Japan', PH: 'Philippines', MY: 'Malaysia',
-  TW: 'Taiwan', RQ: 'Puerto Rico', CB: 'Cambodia', ET: 'Ethiopia', HA: 'Haiti', LT: 'Lithuania',
-  GV: 'Guinea', TS: 'Tunisia', EZ: 'Czech Republic', SW: 'Sweden', PO: 'Portugal', SP: 'Spain',
-  SU: 'Sudan', KG: 'Kyrgyzstan'
+  US: 'United States', USA: 'United States',
+  GB: 'United Kingdom', UK: 'United Kingdom', GBR: 'United Kingdom',
+  FR: 'France', FRA: 'France', DE: 'Germany', DEU: 'Germany', IT: 'Italy', ITA: 'Italy',
+  ES: 'Spain', ESP: 'Spain', NL: 'Netherlands', NLD: 'Netherlands', BE: 'Belgium', BEL: 'Belgium',
+  SE: 'Sweden', SW: 'Sweden', SWE: 'Sweden', NO: 'Norway', NOR: 'Norway',
+  CA: 'Canada', CAN: 'Canada', AU: 'Australia', AUS: 'Australia', NZ: 'New Zealand', NZL: 'New Zealand',
+  BR: 'Brazil', BRA: 'Brazil', AR: 'Argentina', ARG: 'Argentina', CL: 'Chile', CHL: 'Chile',
+  PE: 'Peru', PER: 'Peru', CO: 'Colombia', COL: 'Colombia', MX: 'Mexico', MEX: 'Mexico',
+  EG: 'Egypt', EGY: 'Egypt', ZA: 'South Africa', ZAF: 'South Africa', KE: 'Kenya', KEN: 'Kenya',
+  ID: 'Indonesia', IDN: 'Indonesia', TH: 'Thailand', THA: 'Thailand', IN: 'India', IND: 'India',
+  PK: 'Pakistan', PAK: 'Pakistan', BD: 'Bangladesh', BGD: 'Bangladesh', TR: 'Turkey', TUR: 'Turkey',
+  UA: 'Ukraine', UKR: 'Ukraine', PL: 'Poland', POL: 'Poland', KR: 'South Korea', KOR: 'South Korea',
+  JP: 'Japan', JPN: 'Japan', PH: 'Philippines', PHL: 'Philippines', MY: 'Malaysia', MYS: 'Malaysia',
+  TW: 'Taiwan', TWN: 'Taiwan', RQ: 'Puerto Rico',
+  CB: 'Cambodia', KHM: 'Cambodia', ET: 'Ethiopia', ETH: 'Ethiopia', HA: 'Haiti', HTI: 'Haiti',
+  LT: 'Lithuania', LTU: 'Lithuania', GV: 'Guinea', GIN: 'Guinea', TS: 'Tunisia', TUN: 'Tunisia',
+  EZ: 'Czech Republic', CZE: 'Czech Republic', PO: 'Portugal', PRT: 'Portugal', SP: 'Spain',
+  SU: 'Sudan', SDN: 'Sudan', KG: 'Kyrgyzstan', KGZ: 'Kyrgyzstan'
+};
+
+const regionMap = {
+  'United States': 'North America', 'Canada': 'North America', 'Mexico': 'Latin America & Caribbean', 'Puerto Rico': 'Latin America & Caribbean',
+  'Brazil': 'Latin America & Caribbean', 'Argentina': 'Latin America & Caribbean', 'Chile': 'Latin America & Caribbean', 'Peru': 'Latin America & Caribbean', 'Colombia': 'Latin America & Caribbean',
+  'United Kingdom': 'Western Europe', 'France': 'Western Europe', 'Germany': 'Western Europe', 'Italy': 'Western Europe', 'Spain': 'Western Europe', 'Portugal': 'Western Europe', 'Netherlands': 'Western Europe', 'Belgium': 'Western Europe', 'Sweden': 'Western Europe', 'Norway': 'Western Europe', 'Lithuania': 'Eastern Europe & Central Asia', 'Poland': 'Eastern Europe & Central Asia', 'Ukraine': 'Eastern Europe & Central Asia', 'Czech Republic': 'Eastern Europe & Central Asia', 'Kyrgyzstan': 'Eastern Europe & Central Asia',
+  'Turkey': 'Middle East & North Africa', 'Tunisia': 'Middle East & North Africa', 'Egypt': 'Middle East & North Africa', 'Sudan': 'Sub-Saharan Africa', 'Kenya': 'Sub-Saharan Africa', 'South Africa': 'Sub-Saharan Africa', 'Ethiopia': 'Sub-Saharan Africa', 'Guinea': 'Sub-Saharan Africa',
+  'India': 'Asia-Pacific', 'Pakistan': 'Asia-Pacific', 'Bangladesh': 'Asia-Pacific', 'Indonesia': 'Asia-Pacific', 'Thailand': 'Asia-Pacific', 'Japan': 'Asia-Pacific', 'South Korea': 'Asia-Pacific', 'Philippines': 'Asia-Pacific', 'Malaysia': 'Asia-Pacific', 'Taiwan': 'Asia-Pacific', 'Cambodia': 'Asia-Pacific', 'Australia': 'Asia-Pacific', 'New Zealand': 'Asia-Pacific'
 };
 
 const countryFallback = {
@@ -48,6 +164,10 @@ const countryFallback = {
 
 const cache = {};
 const grants = [];
+const START_YEAR = 2016;
+const END_YEAR = 2025;
+let globe, allPoints = [], earliestYear = END_YEAR, sizeMode = 'amount';
+const activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 
 async function getCoords(loc) {
   if (cache[loc] !== undefined) return cache[loc];
@@ -57,74 +177,308 @@ async function getCoords(loc) {
     const coords = data[0] ? {lat: +data[0].lat, lng: +data[0].lon} : null;
     cache[loc] = coords || null;
     return coords;
-  } catch {
+  } catch (err) {
+    console.warn('Geocode failed for', loc, err);
     cache[loc] = null;
     return null;
   }
 }
 
-fetch('2023.csv')
-  .then(r => r.ok ? r.text() : Promise.reject())
-  .then(text => {
-    Papa.parse(text, {header: true, skipEmptyLines: true}).data.forEach(row => {
-      if (+row.amount <= 0) return;
-      const city = row.recipient_city?.trim() || '';
-      const state = row.recipient_state?.trim() || '';
-      const code = (row.recipient_country?.trim() || 'US').toUpperCase();
-      const countryFull = countryNameMap[code] || code;
-      const loc = code === 'US' 
-        ? (city && state ? `${city}, ${state}, United States` : city ? `${city}, United States` : 'United States')
-        : (city ? `${city}, ${countryFull}` : countryFull);
+function sectorColor(label) {
+  return (SECTOR_RULES.find(r => r.label === label) || SECTOR_RULES[SECTOR_RULES.length - 1]).color;
+}
 
-      const lower = (row.purpose || '').toLowerCase();
-      let cat = 'Hybrid';
-      if (/media|journalis|press|news|outlet|report|broadcast|digital rights|disinformation|fact.check|information|open society journalism|freedom of expression|independent media|press freedom|media development/i.test(lower)) cat = 'Nudge: Media Influence';
-      else if (/master|llm|degree|scholarship|fellow/i.test(lower)) cat = 'Spawn: Leader Training';
-      else if (/general support|core|operating/i.test(lower)) cat = 'Spawn: Org Core';
-      else if (/educate|awareness|dialogue|public program|campaign/i.test(lower)) cat = 'Nudge: Narrative';
-      else if (/research|book|analyze|publication|documentary|archive/i.test(lower)) cat = 'Nudge: Knowledge';
-      else if (/reproductive|gender|lgbt|trans|feminist|women|girl/i.test(lower)) cat = 'Nudge: Fragment';
-      else if (/racial|black|decolon|indigenous|land back|minority/i.test(lower)) cat = 'Nudge: Identity';
+function titleCase(str = '') {
+  return str.toLowerCase().replace(/\b([a-z])/g, s => s.toUpperCase());
+}
 
-      grants.push({loc, name:row.recipient_name||'Anon', amount:+row.amount, purpose:(row.purpose||'').replace(/"/g,"'"), cat, countryFull});
-    });
+function categorizeSectors(purpose = '') {
+  const lower = purpose.toLowerCase();
+  const primaryMatches = PRIMARY_SECTOR_RULES.filter(r => r.regex.test(lower)).map(r => r.label);
+  const uniquePrimary = [...new Set(primaryMatches)];
 
-    const uniqueLocs = [...new Set(grants.map(g => g.loc))];
+  if (uniquePrimary.length) {
+    if (!uniquePrimary.includes(OTHER_LABEL) && uniquePrimary.length < 2) uniquePrimary.push(OTHER_LABEL);
+    return { primary: uniquePrimary[0], secondary: uniquePrimary[1] || null };
+  }
 
-    Promise.all(uniqueLocs.map(getCoords)).then(() => {
-      const globe = Globe()
-        .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
-        .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
-        .showAtmosphere(true)
-        .atmosphereColor('#ff00ff')
-        .atmosphereAltitude(0.2)
-        .pointAltitude(0)
-        .pointRadius(0.28)
-        .pointColor(d => d.cat==='Nudge: Media Influence' ? '#ff00ff' : d.cat.startsWith('Spawn') ? '#00ff00' : '#8888ff')
-        .pointLabel(d => `<b>${d.name}</b><br>$${d.amount.toLocaleString()}<br><span style="color:#ff00ff">[${d.cat}]</span>`)
-        .onPointClick(d => {
-          document.getElementById('title').textContent = d.name;
-          document.getElementById('content').innerHTML = `<b>$${d.amount.toLocaleString()}</b><br><b>${d.cat}</b><br>${d.purpose}<br><i>${d.loc}</i>`;
-          document.getElementById('panel').style.display = 'block';
-        })
-        (document.getElementById('globeViz'));
+  const fallback = FALLBACK_SECTOR_RULES.find(r => r.regex.test(lower));
+  const primary = fallback ? fallback.label : OTHER_LABEL;
+  return { primary, secondary: primary === OTHER_LABEL ? null : OTHER_LABEL };
+}
 
-      const points = grants.map(g => {
-        let c = cache[g.loc] || countryFallback[g.countryFull] || {lat:39.8, lng:-98.5}; // ALWAYS has coords, no skips
-        const jitter = g.loc.includes(',') ? 1.8 : 0;
-        return {
-          lat: c.lat + (Math.random()-0.5)*jitter,
-          lng: c.lng + (Math.random()-0.5)*jitter,
-          ...g
-        };
+function recipientTypeRole(name = '', purpose = '') {
+  const text = `${name} ${purpose}`.toLowerCase();
+  const orgTokens = /foundation|association|institute|center|centre|university|college|school|society|council|committee|trust|coalition|company|inc\b|corp\b|ltd\b|ngo|gmbh|llc|charity|agency/;
+  const personTokens = /scholar|student|fellow|researcher|journalist|writer|artist|activist|lawyer/;
+  const type = orgTokens.test(text) ? 'Organization' : personTokens.test(text) ? 'Individual' : 'Unknown';
+
+  let role = 'Other / Unknown';
+  if (/scholarship|degree|fellow|student|master|graduate/.test(text)) role = 'Student / Scholar';
+  else if (/research|study|book|report|analysis/.test(text)) role = 'Academic / Researcher';
+  else if (/journalist|reporting|media|news/.test(text)) role = 'Journalist / Media';
+  else if (/activis|organizing|advocacy|campaign|grassroots/.test(text)) role = 'Activist / Organizer';
+  else if (/llm\b|legal|law|litigation/.test(text)) role = 'Law / Legal Professional';
+  else if (/artist|culture|theatre|cinema|festival/.test(text)) role = 'Artist / Cultural';
+
+  return { recipient_type: type, recipient_role: role };
+}
+
+function amountBand(amount) {
+  if (amount < 5000) return '< $5k';
+  if (amount < 25000) return '$5k–$25k';
+  if (amount < 100000) return '$25k–$100k';
+  return '> $100k';
+}
+
+function buildLocation(row, yearHint) {
+  const cityRaw = row.recipient_city?.trim() || '';
+  const city = cityRaw ? titleCase(cityRaw) : '';
+  const state = row.recipient_state?.trim() || '';
+  const countryRaw = (row.recipient_country?.trim() || 'US').toUpperCase();
+  const countryFull = countryNameMap[countryRaw] || countryRaw;
+  const loc = countryRaw === 'US'
+    ? (city && state ? `${city}, ${state}, United States` : city ? `${city}, United States` : 'United States')
+    : (city ? `${city}, ${countryFull}` : countryFull);
+  const year = Number(row.tax_year || yearHint) || yearHint;
+  return {
+    loc,
+    countryFull,
+    country_code: countryRaw.length === 3 ? countryRaw : countryRaw.slice(0, 3),
+    city_normalized: city,
+    region: regionMap[countryFull] || 'Other',
+    domestic_foreign: countryRaw === 'US' ? 'Domestic' : 'Foreign',
+    year
+  };
+}
+
+async function loadGrantData() {
+  if (isFileProtocol) {
+    throw new Error('Local file access blocks CSV fetches; serve over HTTP/HTTPS.');
+  }
+
+  let loadedYears = 0;
+  for (let year = START_YEAR; year <= END_YEAR; year++) {
+    try {
+      const resp = await fetch(`${year}.csv`);
+      if (!resp.ok) throw new Error(`Missing ${year}.csv`);
+      const text = await resp.text();
+      loadedYears += 1;
+      Papa.parse(text, {header: true, skipEmptyLines: true}).data.forEach(row => {
+        const amount = +row.amount;
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        const { loc, countryFull, country_code, city_normalized, region, domestic_foreign, year: parsedYear } = buildLocation(row, year);
+        const sectors = categorizeSectors(row.purpose || '');
+        const { recipient_type, recipient_role } = recipientTypeRole(row.recipient_name || '', row.purpose || '');
+        grants.push({
+          loc,
+          countryFull,
+          country_code,
+          region,
+          domestic_foreign,
+          city_normalized,
+          hasCity: !!city_normalized,
+          name: row.recipient_name || 'Anon',
+          amount,
+          amount_band: amountBand(amount),
+          purpose: (row.purpose || '').replace(/"/g, "'"),
+          sector_primary: sectors.primary,
+          sector_secondary: sectors.secondary,
+          sector_color: sectorColor(sectors.primary),
+          recipient_type,
+          recipient_role,
+          year: parsedYear
+        });
+        earliestYear = Math.min(earliestYear, parsedYear);
       });
+    } catch (err) {
+      console.warn(`Skipping ${year}.csv`, err.message || err);
+      continue;
+    }
+  }
 
-      globe.pointsData(points);
+  return loadedYears;
+}
 
-      document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
-      globe.controls().autoRotate = false;
-    });
+function jitteredPoint(base, hasCity) {
+  const jitter = hasCity ? (1.5 + Math.random() * 0.3) : 0;
+  return {
+    lat: base.lat + (Math.random() - 0.5) * jitter,
+    lng: base.lng + (Math.random() - 0.5) * jitter
+  };
+}
+
+function formatCurrency(amount) {
+  return `$${Math.round(amount).toLocaleString()}`;
+}
+
+function aggregatePoints(maxYear, sizeMode, sectorFilter) {
+  const withinYear = allPoints.filter(g => g.year <= maxYear && sectorFilter.has(g.sector_primary));
+  const buckets = new Map();
+
+  withinYear.forEach(g => {
+    const key = `${g.loc}|${g.sector_primary}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        loc: g.loc,
+        countryFull: g.countryFull,
+        country_code: g.country_code,
+        region: g.region,
+        domestic_foreign: g.domestic_foreign,
+        city_normalized: g.city_normalized,
+        sector_primary: g.sector_primary,
+        sector_color: g.sector_color,
+        lat: g.lat,
+        lng: g.lng,
+        totalAmount: 0,
+        grantCount: 0,
+        grants: [],
+        secondaries: new Set(),
+        amountBands: new Map()
+      });
+    }
+    const bucket = buckets.get(key);
+    bucket.totalAmount += g.amount;
+    bucket.grantCount += 1;
+    bucket.secondaries.add(g.sector_secondary || 'Other / Unclear');
+    bucket.amountBands.set(g.amount_band, (bucket.amountBands.get(g.amount_band) || 0) + 1);
+    if (bucket.grants.length < 10) {
+      bucket.grants.push({
+        name: g.name,
+        amount: g.amount,
+        amount_band: g.amount_band,
+        purpose: g.purpose,
+        year: g.year,
+        recipient_type: g.recipient_type,
+        recipient_role: g.recipient_role
+      });
+    }
   });
+
+  const values = Array.from(buckets.values());
+  const maxMetric = Math.max(...values.map(v => sizeMode === 'amount' ? v.totalAmount : v.grantCount), 1);
+  values.forEach(v => {
+    v.secondaryLabels = [...v.secondaries].filter(Boolean);
+    v.amountBands = Array.from(v.amountBands.entries());
+    delete v.secondaries;
+    const metric = sizeMode === 'amount' ? v.totalAmount : v.grantCount;
+    v.radius = 0.18 + (metric / maxMetric) * 0.45;
+    v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
+  });
+  return { points: values, grantCount: withinYear.length };
+}
+
+function renderPoints(maxYear) {
+  const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors);
+  globe.pointsData(points);
+  document.getElementById('yearLabel').textContent = `Showing grants through ${maxYear} · ${grantCount} grants · ${points.length} bubbles`;
+}
+
+(async function init() {
+  if (isFileProtocol) return;
+
+  let loadedYears = 0;
+  try {
+    loadedYears = await loadGrantData();
+  } catch (err) {
+    console.warn('Data load failed:', err);
+  }
+
+  if (!grants.length) {
+    const msg = loadedYears === 0
+      ? 'No CSV files could be fetched. If you opened this via file://, please serve over HTTP; if using HTTP already, ensure the year files exist (2016–2025).'
+      : 'No data available';
+    document.getElementById('yearLabel').textContent = msg;
+    showFileWarning(msg);
+    return;
+  }
+
+  const uniqueLocs = [...new Set(grants.map(g => g.loc))];
+  await Promise.all(uniqueLocs.map(getCoords));
+
+  globe = Globe()
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor('#ff00ff')
+    .atmosphereAltitude(0.2)
+    .pointAltitude(0)
+    .pointRadius(d => d.radius || 0.25)
+    .pointColor(d => d.sector_color)
+    .pointLabel(d => `<b>${d.loc}</b><br><span style=\"color:${d.sector_color}\">${d.sector_primary}</span><br>${d.metricLabel}`)
+    .onPointClick(d => {
+      document.getElementById('title').textContent = d.loc;
+      const bandSummary = (d.amountBands || []).map(([band,count]) => `${band}: ${count}`).join('<br>') || 'n/a';
+      const grantsList = d.grants.length
+        ? d.grants.map(g => `<li><strong>${g.name}</strong> — ${formatCurrency(g.amount)} (${g.amount_band})<br><em>${g.recipient_type} · ${g.recipient_role}</em><br>${g.purpose}</li>`).join('')
+        : '<li>No sample grants</li>';
+      document.getElementById('content').innerHTML = `
+        <div class="panel-year">${d.region} · ${d.domestic_foreign} · ${d.country_code}</div>
+        <div class="panel-amount">${formatCurrency(d.totalAmount)} (${d.grantCount} grants)</div>
+        <div class="chip" style="background:${d.sector_color}22; color:${d.sector_color}; border:1px solid ${d.sector_color}66">${d.sector_primary}</div>
+        <div class="panel-purpose"><strong>Secondary sectors:</strong> ${d.secondaryLabels.join(', ')}</div>
+        <div class="panel-purpose"><strong>Amount bands:</strong><br>${bandSummary}</div>
+        <div class="panel-purpose"><strong>Sample grants</strong><ul>${grantsList}</ul></div>
+        <div class="location">${d.loc}</div>
+      `;
+      document.getElementById('panel').style.display = 'block';
+    })
+    (document.getElementById('globeViz'));
+
+  allPoints = grants.map(g => {
+    const coord = cache[g.loc] || (countryFallback[g.countryFull] ? {lat: countryFallback[g.countryFull][0], lng: countryFallback[g.countryFull][1]} : {lat:39.8, lng:-98.5});
+    const jittered = jitteredPoint(coord, g.hasCity);
+    return {
+      ...g,
+      lat: jittered.lat,
+      lng: jittered.lng
+    };
+  });
+
+  const filtersContainer = document.getElementById('sectorFilters');
+  SECTOR_RULES.forEach(rule => {
+    const id = `sector-${rule.label.replace(/[^a-z0-9]/gi,'-')}`;
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.style.color = '#e5e5ff';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = true;
+    input.onchange = () => {
+      if (input.checked) activeSectors.add(rule.label); else activeSectors.delete(rule.label);
+      renderPoints(+slider.value);
+    };
+    const swatch = document.createElement('span');
+    swatch.style.display = 'inline-block';
+    swatch.style.width = '10px';
+    swatch.style.height = '10px';
+    swatch.style.background = rule.color;
+    swatch.style.margin = '0 6px';
+    swatch.style.borderRadius = '50%';
+    label.appendChild(input);
+    label.appendChild(swatch);
+    label.appendChild(document.createTextNode(rule.label));
+    filtersContainer.appendChild(label);
+  });
+
+  document.querySelectorAll('input[name="sizeMode"]').forEach(radio => {
+    radio.onchange = () => { sizeMode = radio.value; renderPoints(+slider.value); };
+  });
+
+  const slider = document.getElementById('yearSlider');
+  const startValue = Math.max(START_YEAR, Math.min(earliestYear, END_YEAR));
+  slider.min = String(startValue);
+  slider.max = String(END_YEAR);
+  slider.value = startValue;
+  slider.oninput = () => renderPoints(+slider.value);
+
+  renderPoints(+slider.value);
+  document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
+  globe.controls().autoRotate = false;
+})();
+
+} // end non-file protocol guard
 </script>
 </body>
 </html>
