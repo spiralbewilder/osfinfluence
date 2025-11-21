@@ -165,7 +165,9 @@ const cityCountryOverrides = {
   'Geneva': 'Switzerland',
   'Zurich': 'Switzerland',
   'Johannesburg': 'South Africa',
-  'Vienna': 'Austria'
+  'Vienna': 'Austria',
+  'Rio De Janeiro': 'Brazil',
+  'Rio De Janeiro ': 'Brazil'
 };
 
 const regionMap = {
@@ -198,7 +200,9 @@ const activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 async function getCoords(loc) {
   if (cache[loc] !== undefined) return cache[loc];
   try {
-    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(loc)}`);
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(loc)}` , {
+      headers: { 'User-Agent': 'osf-globe/1.0 (+https://example.com)' }
+    });
     if (!resp.ok) throw new Error(`Geocode HTTP ${resp.status}`);
     const data = await resp.json();
     const coords = data[0] ? {lat: +data[0].lat, lng: +data[0].lon} : null;
@@ -290,7 +294,8 @@ function buildLocation(row, yearHint) {
   const stateRaw = row.recipient_state?.trim() || '';
   const state = stateRaw ? titleCase(stateRaw) : '';
   const countryRaw = (row.recipient_country?.trim() || 'US').toUpperCase();
-  const countryFull = countryNameMap[countryRaw] || countryRaw;
+  const overrideCountry = city ? cityCountryOverrides[city] : null;
+  const countryFull = overrideCountry || countryNameMap[countryRaw] || countryRaw;
   const parts = [];
   if (city) parts.push(city);
   if (state) parts.push(state);
@@ -301,7 +306,9 @@ function buildLocation(row, yearHint) {
   if (city && !state) geocodeQueries.push(`${city}, ${countryFull}`);
   if (!city && state) geocodeQueries.push(`${state}, ${countryFull}`);
   if (city) geocodeQueries.push(city);
+  if (overrideCountry && overrideCountry !== countryFull) geocodeQueries.push(`${city}, ${overrideCountry}`);
   geocodeQueries.push(countryFull);
+  const uniqueQueries = [...new Set(geocodeQueries.filter(Boolean))];
   const year = Number(row.tax_year || yearHint) || yearHint;
   return {
     loc,
@@ -309,7 +316,7 @@ function buildLocation(row, yearHint) {
     country_code: countryRaw.length === 3 ? countryRaw : countryRaw.slice(0, 3),
     city_normalized: city,
     state_normalized: state,
-    geocodeQueries,
+    geocodeQueries: uniqueQueries,
     region: regionMap[countryFull] || 'Other',
     domestic_foreign: countryRaw === 'US' ? 'Domestic' : 'Foreign',
     year
