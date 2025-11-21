@@ -156,7 +156,16 @@ const countryNameMap = {
   CB: 'Cambodia', KHM: 'Cambodia', ET: 'Ethiopia', ETH: 'Ethiopia', HA: 'Haiti', HTI: 'Haiti',
   LT: 'Lithuania', LTU: 'Lithuania', GV: 'Guinea', GIN: 'Guinea', TS: 'Tunisia', TUN: 'Tunisia',
   EZ: 'Czech Republic', CZE: 'Czech Republic', PO: 'Portugal', PRT: 'Portugal', SP: 'Spain',
-  SU: 'Sudan', SDN: 'Sudan', KG: 'Kyrgyzstan', KGZ: 'Kyrgyzstan'
+  SU: 'Sudan', SDN: 'Sudan', KG: 'Kyrgyzstan', KGZ: 'Kyrgyzstan',
+  SZ: 'Switzerland', SF: 'South Africa', OC: 'United Kingdom'
+};
+
+const cityCountryOverrides = {
+  'London': 'United Kingdom',
+  'Geneva': 'Switzerland',
+  'Zurich': 'Switzerland',
+  'Johannesburg': 'South Africa',
+  'Vienna': 'Austria'
 };
 
 const regionMap = {
@@ -190,6 +199,7 @@ async function getCoords(loc) {
   if (cache[loc] !== undefined) return cache[loc];
   try {
     const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(loc)}`);
+    if (!resp.ok) throw new Error(`Geocode HTTP ${resp.status}`);
     const data = await resp.json();
     const coords = data[0] ? {lat: +data[0].lat, lng: +data[0].lon} : null;
     cache[loc] = coords || null;
@@ -290,6 +300,7 @@ function buildLocation(row, yearHint) {
   if (city && state) geocodeQueries.push(`${city}, ${state}, ${countryFull}`);
   if (city && !state) geocodeQueries.push(`${city}, ${countryFull}`);
   if (!city && state) geocodeQueries.push(`${state}, ${countryFull}`);
+  if (city) geocodeQueries.push(city);
   geocodeQueries.push(countryFull);
   const year = Number(row.tax_year || yearHint) || yearHint;
   return {
@@ -478,13 +489,19 @@ function renderPoints(maxYear) {
     (document.getElementById('globeViz'));
 
   allPoints = await Promise.all(grants.map(async g => {
-    const coord = await resolveGeocode(g.geocodeQueries, g.countryFull);
-    const jittered = jitteredPoint(coord, g.hasCity);
-    return {
-      ...g,
-      lat: jittered.lat,
-      lng: jittered.lng
-    };
+    try {
+      const coord = await resolveGeocode(g.geocodeQueries, g.countryFull);
+      const jittered = jitteredPoint(coord, g.hasCity);
+      return {
+        ...g,
+        lat: jittered.lat,
+        lng: jittered.lng
+      };
+    } catch (err) {
+      console.warn('Coordinate resolution failed, using fallback for', g.loc, err);
+      const jittered = jitteredPoint({ lat: 39.8, lng: -98.5 }, g.hasCity);
+      return { ...g, lat: jittered.lat, lng: jittered.lng };
+    }
   }));
 
   const filtersContainer = document.getElementById('sectorFilters');
