@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>OSF Grants Globe · Every Grant Plotted (No Skips)</title>
+  <style>
+    :root {
+      --magenta: #ff00ff;
+      --green: #00ff00;
+      --hybrid: #8888ff;
+      --bg: #050010;
+    }
+    body { margin:0; background:var(--bg); overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
+    #globeViz { width:100vw; height:100vh; }
+    #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,0,30,0.95); color:#fff; padding:24px; box-sizing:border-box; overflow-y:auto; border-left:2px solid var(--magenta); display:none; box-shadow:-10px 0 30px rgba(255,0,255,0.25); }
+    #close { position:absolute; top:12px; left:12px; font-size:28px; cursor:pointer; color:var(--magenta); font-weight:bold; }
+    #title { margin:32px 0 6px; font-size:26px; letter-spacing:0.5px; }
+    #content { line-height:1.5; font-size:14px; color:#e5e5ff; }
+    .panel-amount { font-size:24px; margin:6px 0; color:#fff; font-weight:700; }
+    .panel-year { font-size:16px; color:#9ac7ff; margin-bottom:6px; }
+    .panel-purpose { margin:12px 0; }
+    .chip { display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; letter-spacing:0.2px; text-transform:uppercase; font-weight:700; margin-bottom:10px; }
+    .location { font-style:italic; color:#c9c9ff; }
+    #controls { position:fixed; top:0; right:0; width:320px; height:100vh; background:rgba(10,0,30,0.95); border-left:2px solid rgba(255,0,255,0.35); color:#fff; box-shadow:-10px 0 30px rgba(255,0,255,0.25); backdrop-filter:blur(4px); transform:translateX(100%); transition:transform 0.3s ease; z-index:1000; overflow-y:auto; padding:20px; }
+    #controls.open { transform:translateX(0); }
+    #globeViz { transition:margin-right 0.3s ease; }
+    #globeViz.sidebar-open { margin-right:320px; }
+    #toggleControls { position:absolute; top:16px; left:16px; padding:8px 12px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); cursor:pointer; z-index:1001; }
+    #yearLabel { margin-bottom:8px; display:block; font-weight:700; letter-spacing:0.3px; color:#c2c8ff; }
+    #yearSlider { width:260px; accent-color:var(--magenta); }
+    #fileWarning { position:fixed; inset:0; background:rgba(5,0,16,0.96); color:#fff; display:none; align-items:center; justify-content:center; text-align:left; padding:48px; box-sizing:border-box; z-index:10; }
+    #fileWarning .box { max-width:720px; border:1px solid rgba(255,0,255,0.35); background:rgba(20,0,40,0.85); box-shadow:0 0 30px rgba(0,255,255,0.25); padding:28px; border-radius:12px; }
+    #fileWarning h1 { margin-top:0; margin-bottom:12px; font-size:26px; color:#ff7bff; }
+    #fileWarning ol { margin:12px 0; padding-left:20px; }
+    #fileWarning code { background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:6px; }
+  </style>
+  <script src="three.min.js"></script>
+  <script src="globe.gl.min.js"></script>
+  <script src="papaparse.min.js"></script>
+</head>
+<body>
+<div id="globeViz"></div>
+<button id="toggleControls" onclick="toggleControls()">Show Controls</button>
+<div id="controls">
+  <label id="yearLabel" for="yearSlider">Loading data…</label>
+  <input id="yearSlider" type="range" min="2016" max="2025" step="1" value="2016" />
+  <div style="margin-top:10px; color:#c2c8ff; font-size:13px;">
+    <div style="margin-bottom:6px; font-weight:700;">Bubble size</div>
+    <label style="margin-right:8px;"><input type="radio" name="sizeMode" value="amount" checked /> total amount</label>
+    <label><input type="radio" name="sizeMode" value="count" /> grant count</label>
+  </div>
+  <div style="margin-top:12px; color:#c2c8ff; font-size:13px;">
+    <div style="margin-bottom:6px; font-weight:700;">Sectors</div>
+    <div id="sectorFilters" style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px;"></div>
+  </div>
+</div>
+<div id="fileWarning">
+  <div class="box">
+    <h1>Serve this page over HTTP/HTTPS</h1>
+    <p id="fileMessage">Your browser is blocking local <code>file://</code> access, so CSVs cannot load. Please serve the folder with a simple server, then open the page via <code>http://</code> or <code>https://</code>.</p>
+    <ol>
+      <li>Open a terminal in this folder.</li>
+      <li>Run <code>python -m http.server 8000</code> (or any static server).</li>
+      <li>Navigate to <code>http://localhost:8000/osf_globe.html</code>.</li>
+    </ol>
+    <p>This prevents the CORS error you saw when opening the file directly.</p>
+  </div>
+</div>
+<div id="panel">
+  <div id="close">×</div>
+  <h2 id="title"></h2>
+  <div id="content"></div>
+</div>
+
+<script>
+const OTHER_LABEL = 'Other / Unclear';
+const isFileProtocol = window.location.protocol === 'file:';
+const geocodeCache = new Map();
+const geocodes = {};
+const fallbackCoords = {
+  "United States": { lat: 39.8283, lng: -98.5795 },
+  "USA": { lat: 39.8283, lng: -98.5795 },
+  // Add more fallbacks as needed
+};
+
+function showFileWarning(message) {
+  const warning = document.getElementById('fileWarning');
+  const msg = document.getElementById('fileMessage');
+  if (msg && message) msg.textContent = message;
+  if (warning) warning.style.display = 'flex';
+  const controls = document.getElementById('controls');
+  if (controls) controls.style.display = 'none';
+}
+
+if (isFileProtocol) {
+  // Stop network attempts entirely when opened via file:// and surface guidance immediately.
+  window.fetch = async (...args) => {
+    console.warn('Blocked fetch under file://. Args:', args);
+    throw new Error('CSV fetch blocked under file://. Serve over HTTP/HTTPS.');
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('yearLabel').textContent = 'Please open via http:// or https:// — browsers block local file access.';
+    showFileWarning('CSV fetches are blocked when opening via file://. Serve the folder (e.g., python -m http.server 8000) and reopen via http:// or https://.');
+  });
+  window.addEventListener('unhandledrejection', () => {
+    showFileWarning('CSV fetches are blocked under file://. Serve this folder with python -m http.server 8000 and reload via http://localhost:8000/.');
+  });
+} else {
+
+const PRIMARY_SECTOR_RULES = [
+  { label: 'Education & Scholarships', color: '#00eaff', regex: /master|graduate|degree|scholarship|fellow(ship)?|study|training/ },
+  { label: 'Academic & Policy Research', color: '#9d7bff', regex: /research|study|book|report|analysis|thesis/ },
+  { label: 'Media & Journalism', color: '#ff00ff', regex: /journalist|report(ing)?|news(room)?|media|documentary|podcast|investigation/ },
+  { label: 'Civil Society & Activism', color: '#00ff9d', regex: /community organizing|advocacy|movement|grassroots|campaign|civic engagement/ },
+  { label: 'Law, Justice & Rights', color: '#ffa200', regex: /court|litigation|\bllm\b|legal aid|human rights|rule of law/ },
+  { label: 'Governance & Democracy', color: '#ff5f5f', regex: /election|transparency|anti[- ]?corruption|governance|public policy/ },
+  { label: 'Arts & Culture', color: '#ff80d5', regex: /artist|festival|theatre|cinema|culture|exhibition/ },
+  { label: 'Tech, Data & Information', color: '#00ffde', regex: /digital|platform|online|cyber|data|\bai\b|misinformation|social media/ },
+  { label: 'Health & Social Services', color: '#7cff00', regex: /health|mental health|harm reduction|social services|welfare/ }
+];
+
+// Fallback ontology applied only after primary sector matches are checked to avoid overriding
+// Media & Journalism or other primary sectors.
+const FALLBACK_SECTOR_RULES = [
+  { label: 'Other: Cross-cutting capacity & ops', color: '#8888ff', regex: /infrastructure|platform maintenance|tooling|internal systems|operations|finance|accounting|hr\b|compliance|audit|security|risk management|data stewardship/ },
+  { label: 'Other: Philanthropy & field support', color: '#8888ff', regex: /regranting|intermediary|donor collaborative|pooled fund|fiscal sponsorship|landscape scan|field mapping|ecosystem support|technical assistance|technical support|\bta\b/ },
+  { label: 'Other: Convenings & networks', color: '#8888ff', regex: /conference|convening|summit|forum|workshop series|network|cohort|alliance|consortium|community of practice/ },
+  { label: 'Other: Cross-sector innovation & pilots', color: '#8888ff', regex: /pilot|prototype|innovation|lab|experiment|incubator|accelerator|sandbox|cross-sector|multi[- ]?stakeholder/ },
+  { label: 'Other: Emergency & relief', color: '#8888ff', regex: /emergency|relief|rapid response|contingency|crisis|disaster|humanitarian|urgent support/ },
+  { label: 'Other: Administration-only', color: '#8888ff', regex: /rent|utilities|office equipment|administration|bookkeeping|payroll|insurance|registration fee/ },
+  { label: 'Other: Unclassifiable / insufficient detail', color: '#8888ff', regex: /.*/ }
+];
+
+const SECTOR_RULES = [...PRIMARY_SECTOR_RULES, ...FALLBACK_SECTOR_RULES, { label: OTHER_LABEL, color: '#8888ff', regex: /.*/ }];
+
+const MEDIA_OVERRIDE_NAMES = new Set([
+  'stichting lighthouse reports',
+  'arena for journalism in europe',
+  'the bureau of investigative journalism',
+  'global forum for media development aisbl',
+  'reporters without borders',
+  'investigative reporting project italy',
+  'media legal defence initiative',
+  'media monitoring africa trust',
+  'journalism development network',
+  'red en defensa de los derechos digitales ac',
+  'agencia mural de jornalismo das periferias'
+]);
+
+const MEDIA_NAME_TOKENS = [/media\b/, /press\b/, /news(?!letter)/, /journal(ism|ist)?/, /radio/, /tv\b/, /tele(vision)?/, /broadcast/, /investigative/, /report(er|ing)?/, /digital rights/, /information access/];
+const MEDIA_PURPOSE_TOKENS = [/media/, /journalis/, /press/, /news/, /investigative/, /broadcast/, /radio/, /tv\b/, /television/, /documentary/, /podcast/, /digital rights/, /freedom of expression/, /information access/];
+
+const START_YEAR = 2020;
+const END_YEAR = 2023;
+
+const countryNameMap = {
+  US: 'United States', USA: 'United States',
+  GB: 'United Kingdom', UK: 'United Kingdom', GBR: 'United Kingdom',
+  FR: 'France', FRA: 'France', DE: 'Germany', DEU: 'Germany', IT: 'Italy', ITA: 'Italy',
+  ES: 'Spain', ESP: 'Spain', NL: 'Netherlands', NLD: 'Netherlands', BE: 'Belgium', BEL: 'Belgium',
+  SE: 'Sweden', SW: 'Sweden', SWE: 'Sweden', NO: 'Norway', NOR: 'Norway',
+  CA: 'Canada', CAN: 'Canada', AU: 'Australia', AUS: 'Australia', NZ: 'New Zealand', NZL: 'New Zealand',
+  BR: 'Brazil', BRA: 'Brazil', AR: 'Argentina', ARG: 'Argentina', CL: 'Chile', CHL: 'Chile',
+  PE: 'Peru', PER: 'Peru', CO: 'Colombia', COL: 'Colombia', MX: 'Mexico', MEX: 'Mexico',
+  EG: 'Egypt', EGY: 'Egypt', ZA: 'South Africa', ZAF: 'South Africa', KE: 'Kenya', KEN: 'Kenya',
+  ID: 'Indonesia', IDN: 'Indonesia', TH: 'Thailand', THA: 'Thailand', IN: 'India', IND: 'India',
+  PK: 'Pakistan', PAK: 'Pakistan', BD: 'Bangladesh', BGD: 'Bangladesh', TR: 'Turkey', TUR: 'Turkey',
+  UA: 'Ukraine', UKR: 'Ukraine', PL: 'Poland', POL: 'Poland', KR: 'South Korea', KOR: 'South Korea',
+  JP: 'Japan', JPN: 'Japan', PH: 'Philippines', PHL: 'Philippines', MY: 'Malaysia', MYS: 'Malaysia',
+  TW: 'Taiwan', TWN: 'Taiwan', RQ: 'Puerto Rico',
+  CB: 'Cambodia', KHM: 'Cambodia', ET: 'Ethiopia', ETH: 'Ethiopia', HA: 'Haiti', HTI: 'Haiti',
+  LT: 'Lithuania', LTU: 'Lithuania', GV: 'Guinea', GIN: 'Guinea', TS: 'Tunisia', TUN: 'Tunisia',
+  EZ: 'Czech Republic', CZE: 'Czech Republic', PO: 'Portugal', PRT: 'Portugal', SP: 'Spain',
+  SU: 'Sudan', SDN: 'Sudan', KG: 'Kyrgyzstan', KGZ: 'Kyrgyzstan',
+  SZ: 'Switzerland', SF: 'South Africa', OC: 'United Kingdom'
+};
+
+const cityCountryOverrides = {
+  'London': 'United Kingdom',
+  'Geneva': 'Switzerland',
+  'Zurich': 'Switzerland',
+  'Johannesburg': 'South Africa',
+  'Vienna': 'Austria',
+  'Rio De Janeiro': 'Brazil',
+  'Rio De Janeiro ': 'Brazil'
+};
+
+const regionMap = {
+  'United States': 'North America', 'Canada': 'North America', 'Mexico': 'Latin America & Caribbean', 'Puerto Rico': 'Latin America & Caribbean',
+  'Brazil': 'Latin America & Caribbean', 'Argentina': 'Latin America & Caribbean', 'Chile': 'Latin America & Caribbean', 'Peru': 'Latin America & Caribbean', 'Colombia': 'Latin America & Caribbean',
+  'United Kingdom': 'Western Europe', 'France': 'Western Europe', 'Germany': 'Western Europe', 'Italy': 'Western Europe', 'Spain': 'Western Europe', 'Portugal': 'Western Europe', 'Netherlands': 'Western Europe', 'Belgium': 'Western Europe', 'Sweden': 'Western Europe', 'Norway': 'Western Europe', 'Lithuania': 'Eastern Europe & Central Asia', 'Poland': 'Eastern Europe & Central Asia', 'Ukraine': 'Eastern Europe & Central Asia', 'Czech Republic': 'Eastern Europe & Central Asia', 'Kyrgyzstan': 'Eastern Europe & Central Asia',
+  'Turkey': 'Middle East & North Africa', 'Tunisia': 'Middle East & North Africa', 'Egypt': 'Middle East & North Africa', 'Sudan': 'Sub-Saharan Africa', 'Kenya': 'Sub-Saharan Africa', 'South Africa': 'Sub-Saharan Africa', 'Ethiopia': 'Sub-Saharan Africa', 'Guinea': 'Sub-Saharan Africa',
+  'India': 'Asia-Pacific', 'Pakistan': 'Asia-Pacific', 'Bangladesh': 'Asia-Pacific', 'Indonesia': 'Asia-Pacific', 'Thailand': 'Asia-Pacific', 'Japan': 'Asia-Pacific', 'South Korea': 'Asia-Pacific', 'Philippines': 'Asia-Pacific', 'Malaysia': 'Asia-Pacific', 'Taiwan': 'Asia-Pacific', 'Cambodia': 'Asia-Pacific', 'Australia': 'Asia-Pacific', 'New Zealand': 'Asia-Pacific'
+};
+
+function toggleControls() {
+  const controls = document.getElementById('controls');
+  const globe = document.getElementById('globeViz');
+  const button = document.getElementById('toggleControls');
+  if (controls.classList.contains('open')) {
+    controls.classList.remove('open');
+    globe.classList.remove('sidebar-open');
+    button.textContent = 'Show Controls';
+  } else {
+    controls.classList.add('open');
+    globe.classList.add('sidebar-open');
+    button.textContent = 'Hide Controls';
+  }
+}
+
+console.log('Libraries loaded');
+
+const countryFallback = {
+  'United States': [39.8,-98.5], 'United Kingdom': [55.4,-3.4], 'France': [46.2,2.2], 'Germany': [51.2,10.4],
+  'Italy': [41.9,12.5], 'Spain': [40.5,-3.7], 'Netherlands': [52.1,5.3], 'Belgium': [50.5,4.5],
+  'Sweden': [60.1,18.6], 'Norway': [60.5,8.5], 'Canada': [56.1,-106.3], 'Australia': [-25.3,133.8],
+  'New Zealand': [-40.9,174.9], 'Brazil': [-14.2,-51.9], 'Argentina': [-38.4,-63.6], 'Chile': [-35.7,-71.5],
+  'Peru': [-9.2,-75], 'Colombia': [4.6,-74.1], 'Mexico': [23.6,-102.6], 'Egypt': [26.8,30.8],
+  'South Africa': [-30.6,22.9], 'Kenya': [0,37.9], 'Indonesia': [-0.8,113.9], 'Thailand': [15.9,101],
+  'India': [20.6,78.9], 'Pakistan': [30.4,69.3], 'Bangladesh': [23.7,90.4], 'Turkey': [38.9,35.2],
+  'Ukraine': [48.4,31.2], 'Poland': [51.9,19.1], 'South Korea': [35.9,127.8], 'Japan': [36.2,138.3],
+  'Philippines': [12.9,121.8], 'Malaysia': [4.2,101.9], 'Taiwan': [23.7,121], 'Puerto Rico': [18.2,-66.5],
+  'Croatia': [45.1,15.2], 'Serbia': [44.0,21.0], 'Bosnia and Herzegovina': [43.9,17.7], 'Montenegro': [42.7,19.4],
+  'Kosovo': [42.6,20.9], 'North Macedonia': [41.6,21.7], 'Albania': [41.3,19.8], 'Slovenia': [46.1,14.8],
+  'Hungary': [47.2,19.5], 'Czech Republic': [49.8,15.5], 'Slovakia': [48.7,19.7], 'Austria': [47.5,14.6],
+  'Switzerland': [46.8,8.2], 'Liechtenstein': [47.1,9.5], 'Monaco': [43.7,7.4], 'Andorra': [42.5,1.5],
+  'San Marino': [43.9,12.5], 'Vatican City': [41.9,12.5], 'Malta': [35.9,14.5], 'Cyprus': [35.1,33.4],
+  'Luxembourg': [49.6,6.1], 'Iceland': [64.9,-19.0], 'Faroe Islands': [61.9,-6.9], 'Greenland': [71.7,-42.6],
+  'Finland': [61.9,25.7], 'Estonia': [58.6,25.0], 'Latvia': [56.9,24.1], 'Lithuania': [55.2,23.9],
+  'Belarus': [53.7,27.9], 'Moldova': [47.4,28.4], 'Romania': [45.9,24.9], 'Bulgaria': [42.7,25.5],
+  'Greece': [39.1,21.8], 'Portugal': [39.4,-8.2], 'Ireland': [53.4,-7.7], 'Denmark': [56.3,9.5],
+  'Russia': [61.5,105.3], 'Kazakhstan': [48.0,66.9], 'Uzbekistan': [41.4,64.6], 'Turkmenistan': [38.9,59.6],
+  'Tajikistan': [38.9,71.3], 'Kyrgyzstan': [41.2,74.8], 'Afghanistan': [33.9,67.7], 'Pakistan': [30.4,69.3],
+  'Iran': [32.4,53.7], 'Iraq': [33.2,43.7], 'Syria': [34.8,38.9], 'Lebanon': [33.9,35.9],
+  'Jordan': [30.6,36.2], 'Israel': [31.0,34.9], 'Palestine': [31.9,35.2], 'Saudi Arabia': [23.9,45.1],
+  'Yemen': [15.6,48.5], 'Oman': [21.5,55.9], 'United Arab Emirates': [23.4,53.8], 'Qatar': [25.3,51.2],
+  'Bahrain': [26.0,50.6], 'Kuwait': [29.3,47.5], 'Iraq': [33.2,43.7], 'Morocco': [31.8,-5.5],
+  'Algeria': [28.0,1.7], 'Tunisia': [33.9,9.6], 'Libya': [26.3,17.2], 'Sudan': [12.9,30.2],
+  'South Sudan': [6.9,29.7], 'Ethiopia': [9.1,38.8], 'Eritrea': [15.2,39.8], 'Djibouti': [11.8,42.6],
+  'Somalia': [5.2,46.2], 'Uganda': [1.4,32.3], 'Rwanda': [1.9,29.9], 'Burundi': [3.4,29.9],
+  'Tanzania': [6.4,34.9], 'Zambia': [13.1,27.8], 'Zimbabwe': [19.0,29.2], 'Mozambique': [18.7,35.5],
+  'Malawi': [13.2,34.3], 'Botswana': [22.3,24.7], 'Namibia': [22.6,17.1], 'Angola': [11.2,17.9],
+  'Democratic Republic of the Congo': [4.0,21.8], 'Republic of the Congo': [0.2,15.8], 'Gabon': [0.4,11.6],
+  'Equatorial Guinea': [1.7,10.3], 'Cameroon': [7.4,12.4], 'Central African Republic': [6.6,20.9],
+  'Chad': [15.5,18.7], 'Niger': [17.6,8.1], 'Mali': [17.6,-4.0], 'Burkina Faso': [12.2,-1.6],
+  'Ghana': [7.9,-1.0], 'Togo': [8.6,0.8], 'Benin': [9.3,2.3], 'Nigeria': [9.1,8.7],
+  'Ivory Coast': [7.5,-5.5], 'Liberia': [6.3,-9.4], 'Sierra Leone': [8.5,-11.8], 'Guinea': [9.9,-9.7],
+  'Guinea-Bissau': [11.8,-15.2], 'Senegal': [14.5,-14.5], 'Gambia': [13.4,-15.3], 'Mauritania': [21.0,-10.9],
+  'Western Sahara': [24.2,-12.9], 'Cape Verde': [16.0,-24.0], 'Haiti': [18.9,-72.3], 'Dominican Republic': [18.7,-70.2],
+  'Cuba': [21.5,-77.8], 'Jamaica': [18.1,-77.3], 'Trinidad and Tobago': [10.7,-61.2], 'Barbados': [13.2,-59.5],
+  'Bahamas': [25.0,-77.4], 'Belize': [17.2,-88.8], 'Guatemala': [15.8,-90.2], 'El Salvador': [13.8,-88.9],
+  'Honduras': [15.2,-86.2], 'Nicaragua': [12.9,-85.0], 'Costa Rica': [9.7,-83.8], 'Panama': [8.5,-80.8],
+  'Venezuela': [6.4,-66.6], 'Guyana': [4.9,-58.9], 'Suriname': [3.9,-56.0], 'French Guiana': [3.9,-53.2],
+  'Ecuador': [-1.8,-78.2], 'Bolivia': [-16.3,-63.6], 'Paraguay': [-23.4,-58.4], 'Uruguay': [-32.5,-55.8],
+  'Falkland Islands': [-51.8,-59.0], 'South Georgia and the South Sandwich Islands': [-54.4,-36.6],
+  'China': [35.9,104.2], 'Mongolia': [46.9,103.8], 'North Korea': [40.3,127.5], 'Vietnam': [14.1,108.3],
+  'Laos': [19.9,102.1], 'Cambodia': [12.6,104.9], 'Myanmar': [21.9,95.9], 'Sri Lanka': [7.9,80.8],
+  'Nepal': [28.4,84.1], 'Bhutan': [27.5,90.4], 'Bangladesh': [23.7,90.4], 'Maldives': [3.2,73.2],
+  'Armenia': [40.1,45.0], 'Azerbaijan': [40.1,47.6], 'Georgia': [42.3,43.4]
+};
+
+async function getCoords(location) {
+  // Check pre-geocoded data first
+  if (geocodes[location] && geocodes[location].lat !== null) {
+    console.log(`Using pre-geocoded for ${location}`);
+    return { lat: geocodes[location].lat, lng: geocodes[location].lng };
+  }
+  console.log(`No pre-geocode for ${location}, using fallback`);
+  // No API call, just fallback
+  const fallback = fallbackCoords[location] || { lat: 0, lng: 0 };
+  return fallback;
+}
+
+async function resolveGeocode(grantee) {
+  for (const query of grantee.geocodeQueries) {
+    const coords = await getCoords(query);
+    if (coords.lat !== 0 || coords.lng !== 0) {
+      return { ...grantee, lat: coords.lat, lng: coords.lng };
+    }
+    // No delay needed with sequential processing
+  }
+  // Fallback to country center
+  const fallback = countryFallback[grantee.countryFull] || [0, 0];
+  return { ...grantee, lat: fallback[0], lng: fallback[1] };
+}
+
+function sectorColor(label) {
+  return (SECTOR_RULES.find(r => r.label === label) || SECTOR_RULES[SECTOR_RULES.length - 1]).color;
+}
+
+function titleCase(str = '') {
+  return str.toLowerCase().replace(/\b([a-z])/g, s => s.toUpperCase());
+}
+
+function applyMediaBias(name = '', purpose = '', sectors) {
+  const nameKey = name.trim().toLowerCase();
+  const lowerPurpose = (purpose || '').toLowerCase();
+  const mediaNameMatch = MEDIA_OVERRIDE_NAMES.has(nameKey) || MEDIA_NAME_TOKENS.some(re => re.test(nameKey));
+  const mediaPurposeMatch = MEDIA_PURPOSE_TOKENS.some(re => re.test(lowerPurpose));
+
+  if (mediaNameMatch || mediaPurposeMatch) {
+    if (sectors.primary === 'Media & Journalism') return sectors;
+    const secondary = sectors.primary && sectors.primary !== 'Media & Journalism' ? sectors.primary : sectors.secondary;
+    return { primary: 'Media & Journalism', secondary: secondary || sectors.secondary || OTHER_LABEL };
+  }
+
+  return sectors;
+}
+
+function categorizeSectors(purpose = '') {
+  const lower = purpose.toLowerCase();
+  const primaryMatches = PRIMARY_SECTOR_RULES.filter(r => r.regex.test(lower)).map(r => r.label);
+  const uniquePrimary = [...new Set(primaryMatches)];
+
+  if (uniquePrimary.length) {
+    if (!uniquePrimary.includes(OTHER_LABEL) && uniquePrimary.length < 2) uniquePrimary.push(OTHER_LABEL);
+    return { primary: uniquePrimary[0], secondary: uniquePrimary[1] || null };
+  }
+
+  const fallback = FALLBACK_SECTOR_RULES.find(r => r.regex.test(lower));
+  const primary = fallback ? fallback.label : OTHER_LABEL;
+  return { primary, secondary: primary === OTHER_LABEL ? null : OTHER_LABEL };
+}
+
+function recipientTypeRole(name = '', purpose = '') {
+  const text = `${name} ${purpose}`.toLowerCase();
+  const orgTokens = /foundation|association|institute|center|centre|university|college|school|society|council|committee|trust|coalition|company|inc\b|corp\b|ltd\b|ngo|gmbh|llc|charity|agency/;
+  const personTokens = /scholar|student|fellow|researcher|journalist|writer|artist|activist|lawyer/;
+  const type = orgTokens.test(text) ? 'Organization' : personTokens.test(text) ? 'Individual' : 'Unknown';
+
+  let role = 'Other / Unknown';
+  if (/scholarship|degree|fellow|student|master|graduate/.test(text)) role = 'Student / Scholar';
+  else if (/research|study|book|report|analysis/.test(text)) role = 'Academic / Researcher';
+  else if (/journalist|reporting|media|news/.test(text)) role = 'Journalist / Media';
+  else if (/activis|organizing|advocacy|campaign|grassroots/.test(text)) role = 'Activist / Organizer';
+  else if (/llm\b|legal|law|litigation/.test(text)) role = 'Law / Legal Professional';
+  else if (/artist|culture|theatre|cinema|festival/.test(text)) role = 'Artist / Cultural';
+
+  return { recipient_type: type, recipient_role: role };
+}
+
+function amountBand(amount) {
+  if (amount < 5000) return '< $5k';
+  if (amount < 25000) return '$5k–$25k';
+  if (amount < 100000) return '$25k–$100k';
+  return '> $100k';
+}
+
+function buildLocation(row, yearHint) {
+  const cityRaw = row.recipient_city?.trim() || '';
+  const city = cityRaw ? titleCase(cityRaw) : '';
+  const stateRaw = row.recipient_state?.trim() || '';
+  const state = stateRaw ? titleCase(stateRaw) : '';
+  const countryRaw = (row.recipient_country?.trim() || 'US').toUpperCase();
+  const overrideCountry = city ? cityCountryOverrides[city] : null;
+  const countryFull = overrideCountry || countryNameMap[countryRaw] || countryRaw;
+  const parts = [];
+  if (city) parts.push(city);
+  if (state) parts.push(state);
+  parts.push(countryRaw === 'US' ? 'United States' : countryFull);
+  const loc = parts.filter(Boolean).join(', ');
+  const geocodeQueries = [];
+  if (city && state) geocodeQueries.push(`${city}, ${state}, ${countryFull}`);
+  if (city && !state) geocodeQueries.push(`${city}, ${countryFull}`);
+  if (!city && state) geocodeQueries.push(`${state}, ${countryFull}`);
+  if (city) geocodeQueries.push(city);
+  if (overrideCountry && overrideCountry !== countryFull) geocodeQueries.push(`${city}, ${overrideCountry}`);
+  geocodeQueries.push(countryFull);
+  const uniqueQueries = [...new Set(geocodeQueries.filter(Boolean))];
+  const year = Number(row.tax_year || yearHint) || yearHint;
+  return {
+    loc,
+    countryFull,
+    country_code: countryRaw.length === 3 ? countryRaw : countryRaw.slice(0, 3),
+    city_normalized: city,
+    state_normalized: state,
+    geocodeQueries: uniqueQueries,
+    region: regionMap[countryFull] || 'Other',
+    domestic_foreign: countryRaw === 'US' ? 'Domestic' : 'Foreign',
+    year
+  };
+}
+
+async function loadGrantData() {
+  if (isFileProtocol) {
+    throw new Error('Local file access blocks CSV fetches; serve over HTTP/HTTPS.');
+  }
+
+  let grants = [];
+  let loadedYears = 0;
+  let earliestYear = END_YEAR;
+
+  try {
+    const resp = await fetch('grantees.json');
+    if (!resp.ok) throw new Error('Missing grantees.json');
+    const grantees = await resp.json();
+    loadedYears = 1;
+
+    for (const [name, data] of Object.entries(grantees)) {
+      for (const loc of data.locations) {
+        const row = {
+          recipient_name: name,
+          recipient_city: loc.split(', ')[0] || '',
+          recipient_state: loc.split(', ')[1] || '',
+          recipient_country: loc.split(', ')[2] || '',
+          purpose: data.purposes.join('; '),
+          amount: 0
+        };
+        const { loc: builtLoc, countryFull, country_code, city_normalized, state_normalized, geocodeQueries, region, domestic_foreign, year: parsedYear } = buildLocation(row, 2023);
+        const sectors = applyMediaBias(name, data.purposes.join('; '), categorizeSectors(data.purposes.join('; ')));
+        const { recipient_type, recipient_role } = recipientTypeRole(name, data.purposes.join('; '));
+        grants.push({
+          loc: builtLoc,
+          countryFull,
+          country_code,
+          region,
+          domestic_foreign,
+          city_normalized,
+          state_normalized,
+          geocodeQueries,
+          hasCity: !!city_normalized,
+          name,
+          amount: 0,
+          amount_band: 'Unknown',
+          purpose: data.purposes.join('; '),
+          sector_primary: sectors.primary,
+          sector_secondary: sectors.secondary,
+          sector_color: sectorColor(sectors.primary),
+          recipient_type,
+          recipient_role,
+          year: parsedYear
+        });
+        earliestYear = Math.min(earliestYear, parsedYear);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load grantees.json', err);
+  }
+
+  return { grants, loadedYears };
+}
+
+function jitteredPoint(base, hasCity) {
+  const jitter = hasCity ? (1.5 + Math.random() * 0.3) : 0;
+  return {
+    lat: base.lat + (Math.random() - 0.5) * jitter,
+    lng: base.lng + (Math.random() - 0.5) * jitter
+  };
+}
+
+function formatCurrency(amount) {
+  return `$${Math.round(amount).toLocaleString()}`;
+}
+
+function aggregatePoints(maxYear, sizeMode, sectorFilter) {
+  const withinYear = allPoints.filter(g => g.year <= maxYear && sectorFilter.has(g.sector_primary));
+  const buckets = new Map();
+
+  withinYear.forEach(g => {
+    const key = `${g.loc}|${g.sector_primary}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        loc: g.loc,
+        countryFull: g.countryFull,
+        country_code: g.country_code,
+        region: g.region,
+        domestic_foreign: g.domestic_foreign,
+        city_normalized: g.city_normalized,
+        sector_primary: g.sector_primary,
+        sector_color: g.sector_color,
+        lat: g.lat,
+        lng: g.lng,
+        totalAmount: 0,
+        grantCount: 0,
+        grants: [],
+        secondaries: new Set(),
+        amountBands: new Map()
+      });
+    }
+    const bucket = buckets.get(key);
+    bucket.totalAmount += g.amount;
+    bucket.grantCount += 1;
+    bucket.secondaries.add(g.sector_secondary || 'Other / Unclear');
+    bucket.amountBands.set(g.amount_band, (bucket.amountBands.get(g.amount_band) || 0) + 1);
+    if (bucket.grants.length < 10) {
+      bucket.grants.push({
+        name: g.name,
+        amount: g.amount,
+        amount_band: g.amount_band,
+        purpose: g.purpose,
+        year: g.year,
+        recipient_type: g.recipient_type,
+        recipient_role: g.recipient_role
+      });
+    }
+  });
+
+  const values = Array.from(buckets.values());
+  const maxMetric = Math.max(...values.map(v => sizeMode === 'amount' ? v.totalAmount : v.grantCount), 1);
+  values.forEach(v => {
+    v.secondaryLabels = [...v.secondaries].filter(Boolean);
+    v.amountBands = Array.from(v.amountBands.entries());
+    delete v.secondaries;
+    const metric = sizeMode === 'amount' ? v.totalAmount : v.grantCount;
+    v.radius = 0.18 + (metric / maxMetric) * 0.45;
+    v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
+  });
+  return { points: values, grantCount: withinYear.length };
+}
+
+function renderPoints(maxYear) {
+  const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors);
+  globe.pointsData(points);
+  document.getElementById('yearLabel').textContent = `Showing grants through ${maxYear} · ${grantCount} grants · ${points.length} bubbles`;
+}
+
+function onPointClick(event) {
+    const point = event.points[0];
+    const data = point.customdata;
+    // Update panel with grant details
+    document.getElementById('panel').innerHTML = `
+        <h3>${data.name}</h3>
+        <p><strong>Amount:</strong> $${data.amount.toLocaleString()}</p>
+        <p><strong>Year:</strong> ${data.year}</p>
+        <p><strong>Sector:</strong> ${data.sector}</p>
+        <p><strong>Location:</strong> ${data.loc}</p>
+        <p><strong>Description:</strong> ${data.description}</p>
+    `;
+    // Optional: Zoom or highlight
+}
+
+(async function init() {
+  console.log('Starting init');
+  if (isFileProtocol) return;
+
+  let grants = [];
+  let loadedYears = 0;
+  try {
+    const result = await loadGrantData();
+    grants = result.grants;
+    loadedYears = result.loadedYears;
+    console.log('Data loaded, grants:', grants.length);
+  } catch (err) {
+    console.warn('Data load failed:', err);
+  }
+
+  // Load pre-geocoded data
+  try {
+    const resp = await fetch('geocodes.json');
+    const data = await resp.json();
+    Object.assign(geocodes, data);
+    console.log('Geocodes loaded');
+  } catch (e) {
+    console.warn('Failed to load geocodes.json', e);
+  }
+
+  if (!grants.length) {
+    const msg = loadedYears === 0
+      ? 'No CSV files could be fetched. If you opened this via file://, please serve over HTTP; if using HTTP already, ensure the year files exist (2016–2025).'
+      : 'No data available';
+    document.getElementById('yearLabel').textContent = msg;
+    showFileWarning(msg);
+    return;
+  }
+
+  if (typeof Globe === 'undefined') {
+    console.error('Globe library not loaded');
+    return;
+  }
+
+  console.log('InitGlobe starting');
+  let allPoints = [];
+
+  const globe = new Globe()
+    // .globeImageUrl('//unpkg.com/globe.gl/example/img/earth-blue-marble.jpg')
+    .backgroundColor('#001133')
+    .pointLat('lat')
+    .pointLng('lng')
+    .pointColor('color')
+    .pointLabel('label')
+    .pointAltitude(0.01)
+    .pointRadius(1)
+    .onPointClick(onPointClick)
+    (document.getElementById('globeViz'));
+
+  // Enable rotation
+  globe.controls().enableRotate = true;
+  for (const g of grants) {
+    try {
+      const coord = await resolveGeocode(g);
+      const jittered = jitteredPoint(coord, g.hasCity);
+      allPoints.push({
+        ...g,
+        lat: jittered.lat,
+        lng: jittered.lng,
+        color: g.sector_color,
+        label: g.name
+      });
+    } catch (err) {
+      console.warn('Coordinate resolution failed, using fallback for', g.loc, err);
+      const jittered = jitteredPoint({ lat: 39.8, lng: -98.5 }, g.hasCity);
+      allPoints.push({ ...g, lat: jittered.lat, lng: jittered.lng });
+    }
+  }
+
+  console.log('All points processed:', allPoints.length);
+  // Update globe with points
+  globe.pointsData(allPoints);
+
+  const filtersContainer = document.getElementById('sectorFilters');
+
+  // Primary Sectors
+  const primaryDetails = document.createElement('details');
+  primaryDetails.open = true;
+  const primarySummary = document.createElement('summary');
+  primarySummary.textContent = 'Primary Sectors';
+  primarySummary.style.cursor = 'pointer';
+  primaryDetails.appendChild(primarySummary);
+
+  PRIMARY_SECTOR_RULES.forEach(rule => {
+    const id = `sector-${rule.label.replace(/[^a-z0-9]/gi,'-')}`;
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.style.color = '#e5e5ff';
+    label.style.display = 'block';
+    label.style.margin = '4px 0';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = true;
+    input.onchange = () => {
+      if (input.checked) activeSectors.add(rule.label); else activeSectors.delete(rule.label);
+      renderPoints(+slider.value);
+    };
+    const swatch = document.createElement('span');
+    swatch.style.display = 'inline-block';
+    swatch.style.width = '10px';
+    swatch.style.height = '10px';
+    swatch.style.background = rule.color;
+    swatch.style.margin = '0 6px';
+    swatch.style.borderRadius = '50%';
+    label.appendChild(input);
+    label.appendChild(swatch);
+    label.appendChild(document.createTextNode(rule.label));
+    primaryDetails.appendChild(label);
+  });
+
+  // Fallback Sectors
+  const fallbackDetails = document.createElement('details');
+  const fallbackSummary = document.createElement('summary');
+  fallbackSummary.textContent = 'Other Sectors';
+  fallbackSummary.style.cursor = 'pointer';
+  fallbackDetails.appendChild(fallbackSummary);
+
+  FALLBACK_SECTOR_RULES.forEach(rule => {
+    const id = `sector-${rule.label.replace(/[^a-z0-9]/gi,'-')}`;
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.style.color = '#e5e5ff';
+    label.style.display = 'block';
+    label.style.margin = '4px 0';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = true;
+    input.onchange = () => {
+      if (input.checked) activeSectors.add(rule.label); else activeSectors.delete(rule.label);
+      renderPoints(+slider.value);
+    };
+    const swatch = document.createElement('span');
+    swatch.style.display = 'inline-block';
+    swatch.style.width = '10px';
+    swatch.style.height = '10px';
+    swatch.style.background = rule.color;
+    swatch.style.margin = '0 6px';
+    swatch.style.borderRadius = '50%';
+    label.appendChild(input);
+    label.appendChild(swatch);
+    label.appendChild(document.createTextNode(rule.label));
+    fallbackDetails.appendChild(label);
+  });
+
+  filtersContainer.appendChild(primaryDetails);
+  filtersContainer.appendChild(fallbackDetails);
+
+  document.querySelectorAll('input[name="sizeMode"]').forEach(radio => {
+    radio.onchange = () => { sizeMode = radio.value; renderPoints(+slider.value); };
+  });
+
+  const slider = document.getElementById('yearSlider');
+  const startValue = Math.max(START_YEAR, Math.min(earliestYear, END_YEAR));
+  slider.min = String(startValue);
+  slider.max = String(END_YEAR);
+  slider.value = startValue;
+  slider.oninput = () => renderPoints(+slider.value);
+
+  renderPoints(+slider.value);
+  document.getElementById('yearLabel').textContent = 'Year: ' + slider.value;
+  document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
+  globe.controls().autoRotate = false;
+})();
+
+} // end non-file protocol guard
+</script>
+</body>
+</html>
