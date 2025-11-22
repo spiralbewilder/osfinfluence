@@ -201,6 +201,17 @@ const MANUAL_GEOCODES = {
   'Lusaka, , ZA': { lat: -15.3875, lng: 28.3228 },
   'Lusaka, ZA': { lat: -15.3875, lng: 28.3228 },
   'Lusaka, ZMB': { lat: -15.3875, lng: 28.3228 },
+  'Johannesburg, South Africa': { lat: -26.2041, lng: 28.0473 },
+  'Johannesburg, , ZA': { lat: -26.2041, lng: 28.0473 },
+  'Johannesburg, ZA': { lat: -26.2041, lng: 28.0473 },
+  'Johannesburg, , SF': { lat: -26.2041, lng: 28.0473 },
+  'Johannesburg, SF': { lat: -26.2041, lng: 28.0473 },
+  'Tunis': { lat: 36.8065, lng: 10.1815 },
+  'Tunis, Tunisia': { lat: 36.8065, lng: 10.1815 },
+  'Tunis, , TN': { lat: 36.8065, lng: 10.1815 },
+  'Tunis, TN': { lat: 36.8065, lng: 10.1815 },
+  'Tunis, , TUN': { lat: 36.8065, lng: 10.1815 },
+  'Tunis, TUN': { lat: 36.8065, lng: 10.1815 },
   'Guaynabo': { lat: 18.3617, lng: -66.1100 },
   'Guaynabo, PR': { lat: 18.3617, lng: -66.1100 },
   'Loiza': { lat: 18.4322, lng: -65.8782 },
@@ -245,8 +256,10 @@ const cityCountryOverrides = {
   'Geneva': 'Switzerland',
   'Zurich': 'Switzerland',
   'Johannesburg': 'South Africa',
+  'Johannesburg, South Africa': 'South Africa',
   'Vienna': 'Austria',
   'Lusaka': 'Zambia',
+  'Tunis': 'Tunisia',
   'Rio De Janeiro': 'Brazil',
   'Rio De Janeiro ': 'Brazil'
 };
@@ -354,6 +367,11 @@ const cityFallbacks = {
   'lusaka, , za': { lat: -15.3875, lng: 28.3228 },
   'lusaka, zmb': { lat: -15.3875, lng: 28.3228 },
   'johannesburg': { lat: -26.2041, lng: 28.0473 },
+  'johannesburg, south africa': { lat: -26.2041, lng: 28.0473 },
+  'johannesburg, , za': { lat: -26.2041, lng: 28.0473 },
+  'johannesburg, za': { lat: -26.2041, lng: 28.0473 },
+  'johannesburg, , sf': { lat: -26.2041, lng: 28.0473 },
+  'johannesburg, sf': { lat: -26.2041, lng: 28.0473 },
   'bogota': { lat: 4.711, lng: -74.0721 },
   'portauprince': { lat: 18.5944, lng: -72.3074 },
   'porta u prince': { lat: 18.5944, lng: -72.3074 },
@@ -401,7 +419,13 @@ const cityFallbacks = {
   'zug': { lat: 47.1662, lng: 8.5155 },
   'zug, switzerland': { lat: 47.1662, lng: 8.5155 },
   'zug, ch': { lat: 47.1662, lng: 8.5155 },
-  'zug, , ch': { lat: 47.1662, lng: 8.5155 }
+  'zug, , ch': { lat: 47.1662, lng: 8.5155 },
+  'tunis': { lat: 36.8065, lng: 10.1815 },
+  'tunis, tunisia': { lat: 36.8065, lng: 10.1815 },
+  'tunis, tn': { lat: 36.8065, lng: 10.1815 },
+  'tunis, , tn': { lat: 36.8065, lng: 10.1815 },
+  'tunis, tun': { lat: 36.8065, lng: 10.1815 },
+  'tunis, , tun': { lat: 36.8065, lng: 10.1815 }
 };
 
 async function getCoords(location) {
