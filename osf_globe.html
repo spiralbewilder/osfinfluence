@@ -872,8 +872,8 @@ function onPointClick(point, event) {
     .pointLng('lng')
     .pointColor('color')
     .pointLabel('label')
-    .pointAltitude(p => 0.001 + Math.min(0.2, (p.radius || 0.05) * 0.6))
-    .pointRadius(p => Math.max(0.08, Math.min(0.45, p.radius || 0.08)))
+    .pointAltitude(p => 0.0005 + Math.min(0.12, (p.radius || 0.02) * 0.5))
+    .pointRadius(p => Math.max(0.06, Math.min(0.35, p.radius || 0.06)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
 
