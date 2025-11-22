@@ -161,6 +161,8 @@ let sizeMode = 'amount';
 let activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 let earliestYear = END_YEAR;
 const geocodeLookup = new Map();
+let countriesGeo = [];
+let statesGeo = [];
 
 const countryNameMap = {
   US: 'United States', USA: 'United States',
