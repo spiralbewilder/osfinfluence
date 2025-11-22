@@ -752,7 +752,7 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
     v.amountBands = Array.from(v.amountBands.entries());
     delete v.secondaries;
     const metric = sizeMode === 'amount' ? v.totalAmount : v.grantCount;
-    v.radius = 0.06 + (metric / maxMetric) * 0.26;
+    v.radius = 0.06 + Math.pow(metric / maxMetric, 0.5) * 0.32;
     v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
     v.color = v.color || v.sector_color;
     v.label = `${v.loc} · ${v.sector_primary} · ${v.metricLabel}`;
@@ -872,8 +872,8 @@ function onPointClick(point, event) {
     .pointLng('lng')
     .pointColor('color')
     .pointLabel('label')
-    .pointAltitude(p => 0.01 + Math.min(0.12, (p.radius || 0.1) * 0.4))
-    .pointRadius(p => Math.max(0.12, Math.min(0.45, p.radius || 0.12)))
+    .pointAltitude(p => 0.005 + Math.min(0.25, Math.pow(p.radius || 0.1, 1.4)))
+    .pointRadius(p => Math.max(0.12, Math.min(0.55, p.radius || 0.12)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
 
