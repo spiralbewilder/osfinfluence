@@ -185,7 +185,7 @@ const countryNameMap = {
   SZ: 'Switzerland', SF: 'South Africa', OC: 'United Kingdom',
   NP: 'Nepal', NI: 'Nigeria', NG: 'Nigeria', GM: 'Gambia', GA: 'Gambia',
   JO: 'Jordan', IS: 'Israel', IL: 'Israel', BN: 'Benin', ML: 'Mali', UG: 'Uganda',
-  AF: 'Afghanistan', CS: 'Costa Rica', LE: 'Lebanon', BM: 'Myanmar', LH: 'Lithuania'
+  AF: 'Afghanistan', CS: 'Costa Rica', LE: 'Lebanon', BM: 'Myanmar', LH: 'Lithuania', BK: 'Bosnia and Herzegovina', CG: 'Democratic Republic of the Congo', KV: 'Kosovo', RI: 'Serbia', HU: 'Hungary'
 };
 
 const cityCountryOverrides = {
@@ -293,10 +293,22 @@ const cityFallbacks = {
   'vilnius': { lat: 54.6872, lng: 25.2797 },
   'san jose': { lat: 9.9281, lng: -84.0907 },
   'johannesburg': { lat: -26.2041, lng: 28.0473 },
-  'bogota': { lat: 4.711, lng: -74.0721 }
+  'bogota': { lat: 4.711, lng: -74.0721 },
+  'portauprince': { lat: 18.5944, lng: -72.3074 },
+  'porta u prince': { lat: 18.5944, lng: -72.3074 },
+  'pristina': { lat: 42.6629, lng: 21.1655 },
+  'demawso': { lat: 19.627, lng: 97.208 },
+  'takhmao': { lat: 11.4828, lng: 104.9444 },
+  'conakry': { lat: 9.6412, lng: -13.5784 },
+  'lubumbashi': { lat: -11.687, lng: 27.5026 },
+  'sarajevo': { lat: 43.8563, lng: 18.4131 }
 };
 
 async function getCoords(location) {
+  const lower = (location || '').toLowerCase();
+  if (geocodeLookup.has(lower)) {
+    return geocodeLookup.get(lower);
+  }
   // Check pre-geocoded data first
   if (geocodes[location] && geocodes[location].lat !== null) {
     console.log(`Using pre-geocoded for ${location}`);
@@ -309,8 +321,19 @@ async function getCoords(location) {
 }
 
 async function resolveGeocode(grantee) {
+  let countryFallbackCandidate = null;
+
   for (const query of grantee.geocodeQueries) {
     const coords = await getCoords(query);
+    const isCountryQuery = query === grantee.countryFull || query === grantee.country_code;
+    const countryFallbackCoords = fallbackCoords[query];
+
+    // If this is just a country-level fallback, remember it but keep searching for city-level matches.
+    if (isCountryQuery && countryFallbackCoords && coords.lat === countryFallbackCoords.lat && coords.lng === countryFallbackCoords.lng) {
+      countryFallbackCandidate = coords;
+      continue;
+    }
+
     if (coords.lat !== 0 || coords.lng !== 0) {
       return { ...grantee, lat: coords.lat, lng: coords.lng };
     }
@@ -327,6 +350,9 @@ async function resolveGeocode(grantee) {
   if (cityOnly && cityFallbacks[cityOnly]) {
     const coords = cityFallbacks[cityOnly];
     return { ...grantee, lat: coords.lat, lng: coords.lng };
+  }
+  if (countryFallbackCandidate) {
+    return { ...grantee, lat: countryFallbackCandidate.lat, lng: countryFallbackCandidate.lng };
   }
   // Fallback to country center
   const fallback = countryFallback[grantee.countryFull] || countryFallback[grantee.country_code] || [20, 0];
@@ -611,6 +637,11 @@ function formatCurrency(amount) {
   return `$${Math.round(amount).toLocaleString()}`;
 }
 
+function buildGeocodeLookup() {
+  geocodeLookup.clear();
+  Object.entries(geocodes).forEach(([k, v]) => geocodeLookup.set(k.toLowerCase(), v));
+}
+
 function aggregatePoints(maxYear, sizeMode, sectorFilter) {
   if (!allPoints.length) return { points: [], grantCount: 0 };
 
@@ -796,6 +827,7 @@ function onPointClick(point, event) {
     const resp = await fetch('geocodes.json');
     const data = await resp.json();
     Object.assign(geocodes, data);
+    buildGeocodeLookup();
     console.log('Geocodes loaded');
   } catch (e) {
     console.warn('Failed to load geocodes.json', e);
