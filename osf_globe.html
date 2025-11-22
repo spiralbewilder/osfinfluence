@@ -160,8 +160,6 @@ let allPoints = [];
 let sizeMode = 'amount';
 let activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 let earliestYear = END_YEAR;
-let sorosTexture = null;
-let sorosSpriteLayer = null;
 const geocodeLookup = new Map();
 
 const countryNameMap = {
@@ -707,69 +705,10 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
   return { points: values, grantCount: withinYear.length };
 }
 
-function disposeSorosLayer() {
-  if (sorosSpriteLayer && sorosSpriteLayer.geometry) sorosSpriteLayer.geometry.dispose();
-  if (sorosSpriteLayer && sorosSpriteLayer.material) sorosSpriteLayer.material.dispose();
-  const scene = globeInstance && globeInstance.scene ? globeInstance.scene() : null;
-  if (scene && sorosSpriteLayer) scene.remove(sorosSpriteLayer);
-  sorosSpriteLayer = null;
-}
-
-function latLngToCartesian(lat, lng, alt = 0) {
-  const radius = (globeInstance && globeInstance.getGlobeRadius && globeInstance.getGlobeRadius()) || 100;
-  const latRad = lat * Math.PI / 180;
-  const lngRad = lng * Math.PI / 180;
-  const r = radius * (1 + alt);
-  const x = r * Math.cos(latRad) * Math.sin(lngRad);
-  const y = r * Math.sin(latRad);
-  const z = r * Math.cos(latRad) * Math.cos(lngRad);
-  return { x, y, z };
-}
-
-async function renderSorosSprites(points) {
-  if (!globeInstance || !globeInstance.scene || !points || !points.length) return;
-  disposeSorosLayer();
-
-  if (!sorosTexture) {
-    sorosTexture = new THREE.TextureLoader().load('soros.png');
-    sorosTexture.encoding = THREE.sRGBEncoding;
-    sorosTexture.needsUpdate = true;
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  const positions = [];
-  const colors = [];
-
-  points.forEach(p => {
-    const cart = latLngToCartesian(p.lat, p.lng, 0.005 + (p.radius || 0.05) * 0.08);
-    positions.push(cart.x, cart.y, cart.z);
-    const color = new THREE.Color(p.sector_color || p.color || '#ffffff');
-    colors.push(color.r, color.g, color.b);
-  });
-
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-  const material = new THREE.PointsMaterial({
-    map: sorosTexture,
-    transparent: true,
-    depthWrite: false,
-    sizeAttenuation: false,
-    vertexColors: true,
-    alphaTest: 0.4,
-    size: 10
-  });
-
-  sorosSpriteLayer = new THREE.Points(geometry, material);
-  const scene = globeInstance.scene();
-  scene.add(sorosSpriteLayer);
-}
-
 function renderPoints(maxYear) {
   if (!globeInstance) return;
   const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors);
   globeInstance.pointsData(points);
-  renderSorosSprites(points);
   document.getElementById('yearLabel').textContent = `Showing grants through ${maxYear} · ${grantCount} grants · ${points.length} bubbles`;
 }
 
@@ -869,8 +808,8 @@ function onPointClick(point, event) {
     .pointLng('lng')
     .pointColor('color')
     .pointLabel('label')
-    .pointAltitude(p => 0.01 + (p.radius || 0.08) * 0.35)
-    .pointRadius('radius')
+    .pointAltitude(p => 0.01 + (p.radius || 0.1) * 0.5)
+    .pointRadius(p => Math.max(0.12, Math.min(0.45, p.radius || 0.12)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
 
