@@ -752,10 +752,23 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
     v.amountBands = Array.from(v.amountBands.entries());
     delete v.secondaries;
     const metric = sizeMode === 'amount' ? v.totalAmount : v.grantCount;
-    v.radius = 0.1 + Math.pow(metric / maxMetric, 0.5) * 0.35;
+    const metricVal = Math.max(metric, 0);
+    if (sizeMode === 'amount') {
+      const scaled = maxMetric > 0 ? Math.pow(Math.log10(metricVal + 1) / Math.log10(maxMetric + 1), 2.5) : 0;
+      v.radius = 0.02 + scaled * 0.33;
+    } else {
+      const scaled = maxMetric > 0 ? Math.pow(metric / maxMetric, 0.5) : 0;
+      v.radius = 0.06 + scaled * 0.22;
+    }
+    v.radius = Math.max(0.02, Math.min(0.35, v.radius));
     v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
     v.color = v.color || v.sector_color;
     v.label = `${v.loc} · ${v.sector_primary} · ${v.metricLabel}`;
+    v.yearLabel = v.minYear === v.maxYear ? `${v.minYear}` : `${v.minYear}–${v.maxYear}`;
+    v.yearBreakdown = v.yearStats ? Array.from(v.yearStats.entries())
+      .map(([year, stats]) => ({ year, count: stats.count, total: stats.total }))
+      .sort((a, b) => b.year - a.year) : [];
+    delete v.yearStats;
   });
   return { points: values, grantCount: withinYear.length };
 }
@@ -872,7 +885,7 @@ function onPointClick(point, event) {
     .pointLng('lng')
     .pointColor('color')
     .pointLabel('label')
-    .pointAltitude(p => 0.0005 + Math.min(0.12, (p.radius || 0.02) * 0.5))
+    .pointAltitude(p => 0.0003 + Math.min(0.25, (p.radius || 0.05) * 0.7))
     .pointRadius(p => Math.max(0.06, Math.min(0.35, p.radius || 0.06)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
