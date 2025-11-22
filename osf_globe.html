@@ -28,6 +28,7 @@
     #globeViz { transition:margin-right 0.3s ease; }
     #globeViz.sidebar-open { margin-right:320px; }
     #toggleControls { position:absolute; top:16px; left:16px; padding:8px 12px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); cursor:pointer; z-index:1001; }
+    #titleBadge { position:absolute; top:56px; left:16px; padding:8px 12px; background:rgba(20,0,40,0.78); border:1px solid rgba(136,136,255,0.45); border-radius:10px; color:#cce4ff; font-weight:700; letter-spacing:0.3px; box-shadow:0 0 12px rgba(0,200,255,0.18); z-index:1001; pointer-events:none; }
     #yearLabel { margin-bottom:8px; display:block; font-weight:700; letter-spacing:0.3px; color:#c2c8ff; }
     #yearSlider { width:260px; accent-color:var(--magenta); }
     #fileWarning { position:fixed; inset:0; background:rgba(5,0,16,0.96); color:#fff; display:none; align-items:center; justify-content:center; text-align:left; padding:48px; box-sizing:border-box; z-index:10; }
@@ -44,6 +45,7 @@
 <div id="bgLayer"></div>
 <div id="globeViz"></div>
 <button id="toggleControls" onclick="toggleControls()">Show Controls</button>
+<div id="titleBadge">OSF/Soros Grantees 2020–2023</div>
 <div id="controls">
   <label id="yearLabel" for="yearSlider">Loading data…</label>
   <input id="yearSlider" type="range" min="2016" max="2025" step="1" value="2016" />
