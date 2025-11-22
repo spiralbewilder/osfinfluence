@@ -757,13 +757,14 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
     const metric = sizeMode === 'amount' ? v.totalAmount : v.grantCount;
     const metricVal = Math.max(metric, 0);
     if (sizeMode === 'amount') {
-      const scaled = maxMetric > 0 ? Math.pow(Math.log10(metricVal + 1) / Math.log10(maxMetric + 1), 2.5) : 0;
-      v.radius = 0.02 + scaled * 0.33;
+      const ratio = maxMetric > 0 ? Math.log10(metricVal + 1) / Math.log10(maxMetric + 1) : 0;
+      const scaled = Math.pow(ratio, 3.4);
+      v.radius = 0.01 + scaled * 0.5;
     } else {
-      const scaled = maxMetric > 0 ? Math.pow(metric / maxMetric, 0.5) : 0;
-      v.radius = 0.06 + scaled * 0.22;
+      const scaled = maxMetric > 0 ? Math.pow(metric / maxMetric, 0.65) : 0;
+      v.radius = 0.04 + scaled * 0.26;
     }
-    v.radius = Math.max(0.02, Math.min(0.35, v.radius));
+    v.radius = Math.max(0.01, Math.min(0.5, v.radius));
     v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
     v.color = v.color || v.sector_color;
     v.label = `${v.loc} · ${v.sector_primary} · ${v.metricLabel}`;
@@ -883,13 +884,13 @@ function onPointClick(point, event) {
 
   globeInstance = new Globe()
     .globeImageUrl(globeTexture)
-    .backgroundColor('#0b1f4a')
+    .backgroundColor('rgba(0,0,0,0)')
     .pointLat('lat')
     .pointLng('lng')
     .pointColor('color')
     .pointLabel('label')
-    .pointAltitude(p => 0.0003 + Math.min(0.25, (p.radius || 0.05) * 0.7))
-    .pointRadius(p => Math.max(0.06, Math.min(0.35, p.radius || 0.06)))
+    .pointAltitude(p => 0.00005 + Math.min(0.32, Math.pow(Math.max(p.radius || 0.02, 0.01), 1.8) * 0.9))
+    .pointRadius(p => Math.max(0.01, Math.min(0.5, p.radius || 0.05)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
 
