@@ -15966,5 +15966,13 @@
   "WASHINGTON, United States": {
     "lat": 38.9072,
     "lng": -77.0369
+  },
+  "Johannesburg, , SF": {
+    "lat": -26.2041,
+    "lng": 28.0473
+  },
+  "JOHANNESBURG, , SF": {
+    "lat": -26.2041,
+    "lng": 28.0473
   }
 }
