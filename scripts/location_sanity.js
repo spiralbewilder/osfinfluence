@@ -1,13 +1,16 @@
-// Heuristic scanner for location/name/purpose mismatches using grantees.json (object keyed by recipient).
-// Flags locations whose recipient/purpose text hints at a different country than the location string.
+// Heuristic scanner for country-context mismatches using geocodes.json + grantees.json.
+// Flags locations whose recipient/purpose text suggests a different country than the resolved geocode country.
+// Run: node scripts/location_sanity.js [grantees.json] [geocodes.json]
 const fs = require('fs');
+const pathGrantees = process.argv[2] || 'grantees.json';
+const pathGeocodes = process.argv[3] || 'geocodes.json';
 
-const granteesPath = process.argv[2] || 'grantees.json';
-const raw = JSON.parse(fs.readFileSync(granteesPath, 'utf8'));
+const rawGrantees = JSON.parse(fs.readFileSync(pathGrantees, 'utf8'));
+const grantees = Array.isArray(rawGrantees)
+  ? rawGrantees
+  : Object.entries(rawGrantees).map(([name, val]) => ({ name, ...val }));
 
-const entries = Array.isArray(raw)
-  ? raw
-  : Object.entries(raw).map(([name, val]) => ({ name, ...val }));
+const geocodes = JSON.parse(fs.readFileSync(pathGeocodes, 'utf8'));
 
 const countryMap = {
   'United States': 'United States', USA: 'United States', US: 'United States',
@@ -24,13 +27,8 @@ const countryMap = {
   'Costa Rica': 'Costa Rica', Panama: 'Panama', Guatemala: 'Guatemala', Honduras: 'Honduras', 'El Salvador': 'El Salvador', Nicaragua: 'Nicaragua', Cuba: 'Cuba', Haiti: 'Haiti', 'Dominican Republic': 'Dominican Republic', Jamaica: 'Jamaica'
 };
 const countryNames = Object.keys(countryMap);
+
 const normalizeCountry = (name) => (name && countryMap[name.trim()]) || null;
-const countryFromLoc = (loc) => {
-  if (!loc) return null;
-  const parts = loc.split(',').map((s) => s.trim()).filter(Boolean);
-  const last = parts[parts.length - 1];
-  return normalizeCountry(last);
-};
 const countryHints = (text) => {
   const lower = (text || '').toLowerCase();
   const hits = new Set();
@@ -40,20 +38,31 @@ const countryHints = (text) => {
   return hits;
 };
 
+function countryFromLatLng(lat, lng) {
+  // Approximate country detection via geocodes.json keys: reverse-match by matching lat/lng entry.
+  // If not found, return null. This is a fallback; better would be a proper country lookup by polygons.
+  const key = Object.keys(geocodes).find(k => geocodes[k].lat === lat && geocodes[k].lng === lng);
+  if (!key) return null;
+  const parts = key.split(',').map(s => s.trim()).filter(Boolean);
+  const last = parts[parts.length - 1];
+  return normalizeCountry(last);
+}
+
 const buckets = new Map();
-for (const e of entries) {
-  const locs = e.locations || (e.location ? [e.location] : []);
-  const texts = [e.name || '', ...(e.purposes || []), ...(e.addresses || [])];
+for (const g of grantees) {
+  const locs = g.locations || (g.location ? [g.location] : []);
+  const texts = [g.name || '', ...(g.purposes || []), ...(g.addresses || [])];
   const hintsCombined = new Set();
   for (const t of texts) {
     for (const h of countryHints(t)) hintsCombined.add(h);
   }
   for (const loc of locs) {
-    const locCountry = countryFromLoc(loc);
+    const geo = geocodes[loc];
+    const locCountry = geo ? countryFromLatLng(geo.lat, geo.lng) : null;
     const bucket = buckets.get(loc) || { loc, count: 0, locCountry, hintCountries: new Set(), samples: [] };
     bucket.count += 1;
     for (const h of hintsCombined) bucket.hintCountries.add(h);
-    if (bucket.samples.length < 2) bucket.samples.push(e.name || 'Recipient');
+    if (bucket.samples.length < 2) bucket.samples.push(g.name || 'Recipient');
     buckets.set(loc, bucket);
   }
 }
@@ -61,13 +70,13 @@ for (const e of entries) {
 const candidates = Array.from(buckets.values())
   .filter((b) => b.count >= 2)
   .filter((b) => {
-    if (!b.locCountry) return b.hintCountries.size > 0;
+    if (!b.locCountry) return b.hintCountries.size > 0; // no resolved country but hints exist
     return Array.from(b.hintCountries).some((h) => h && h !== b.locCountry);
   })
   .sort((a, b) => b.count - a.count)
   .slice(0, 40);
 
-console.log('Possible country-context mismatches (top by count):');
+console.log('Possible country-context mismatches (top by count using geocodes):');
 for (const b of candidates) {
   const hints = Array.from(b.hintCountries).join('; ') || '—';
   const samples = b.samples.join(' | ');
