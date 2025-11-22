@@ -732,6 +732,9 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
         totalAmount: 0,
         grantCount: 0,
         grants: [],
+        yearStats: new Map(),
+        minYear: Number.POSITIVE_INFINITY,
+        maxYear: Number.NEGATIVE_INFINITY,
         secondaries: new Set(),
         amountBands: new Map(),
         color: g.sector_color,
@@ -745,6 +748,15 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
     bucket.secondaries.add(g.sector_secondary || 'Other / Unclear');
     const band = g.amount_band || 'Unknown';
     bucket.amountBands.set(band, (bucket.amountBands.get(band) || 0) + 1);
+    const yr = Number(g.year);
+    if (Number.isFinite(yr)) {
+      bucket.minYear = Math.min(bucket.minYear, yr);
+      bucket.maxYear = Math.max(bucket.maxYear, yr);
+      const stats = bucket.yearStats.get(yr) || { count: 0, total: 0 };
+      stats.count += 1;
+      stats.total += amt;
+      bucket.yearStats.set(yr, stats);
+    }
     bucket.grants.push({
       name: g.name,
       amount: amt,
@@ -776,7 +788,11 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
     v.metricLabel = sizeMode === 'amount' ? formatCurrency(v.totalAmount) : `${v.grantCount} grants`;
     v.color = v.color || v.sector_color;
     v.label = `${v.loc} · ${v.sector_primary} · ${v.metricLabel}`;
-    v.yearLabel = v.minYear === v.maxYear ? `${v.minYear}` : `${v.minYear}–${v.maxYear}`;
+    if (!Number.isFinite(v.minYear) || !Number.isFinite(v.maxYear) || v.minYear === Number.POSITIVE_INFINITY) {
+      v.yearLabel = '';
+    } else {
+      v.yearLabel = v.minYear === v.maxYear ? `${v.minYear}` : `${v.minYear}–${v.maxYear}`;
+    }
     v.yearBreakdown = v.yearStats ? Array.from(v.yearStats.entries())
       .map(([year, stats]) => ({ year, count: stats.count, total: stats.total }))
       .sort((a, b) => b.year - a.year) : [];
