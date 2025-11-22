@@ -15770,5 +15770,201 @@
   "Berlin, Gambia": {
     "lat": 13.4432,
     "lng": -16.5758
+  },
+  "Washington, United States": {
+    "lat": 38.9072,
+    "lng": -77.0369
+  },
+  "NEW YORK, United States": {
+    "lat": 40.7128,
+    "lng": -74.006
+  },
+  "New York, United States": {
+    "lat": 40.7128,
+    "lng": -74.006
+  },
+  "Brooklyn, United States": {
+    "lat": 40.6782,
+    "lng": -73.9442
+  },
+  "BROOKLYN, United States": {
+    "lat": 40.6782,
+    "lng": -73.9442
+  },
+  "San Francisco, United States": {
+    "lat": 37.7749,
+    "lng": -122.4194
+  },
+  "SAN FRANCISCO, United States": {
+    "lat": 37.7749,
+    "lng": -122.4194
+  },
+  "Los Angeles, United States": {
+    "lat": 34.0522,
+    "lng": -118.2437
+  },
+  "LOS ANGELES, United States": {
+    "lat": 34.0522,
+    "lng": -118.2437
+  },
+  "Chicago, United States": {
+    "lat": 41.8781,
+    "lng": -87.6298
+  },
+  "CHICAGO, United States": {
+    "lat": 41.8781,
+    "lng": -87.6298
+  },
+  "Atlanta, United States": {
+    "lat": 33.749,
+    "lng": -84.388
+  },
+  "ATLANTA, United States": {
+    "lat": 33.749,
+    "lng": -84.388
+  },
+  "Baltimore, United States": {
+    "lat": 39.2904,
+    "lng": -76.6122
+  },
+  "BALTIMORE, United States": {
+    "lat": 39.2904,
+    "lng": -76.6122
+  },
+  "Oakland, United States": {
+    "lat": 37.8044,
+    "lng": -122.2711
+  },
+  "OAKLAND, United States": {
+    "lat": 37.8044,
+    "lng": -122.2711
+  },
+  "San Juan, Puerto Rico": {
+    "lat": 18.4655,
+    "lng": -66.1057
+  },
+  "SAN JUAN, Puerto Rico": {
+    "lat": 18.4655,
+    "lng": -66.1057
+  },
+  "Mexico City, Mexico": {
+    "lat": 19.4326,
+    "lng": -99.1332
+  },
+  "Amsterdam, Netherlands": {
+    "lat": 52.3676,
+    "lng": 4.9041
+  },
+  "Paris, France": {
+    "lat": 48.8566,
+    "lng": 2.3522
+  },
+  "PARIS,  FR": {
+    "lat": 48.8566,
+    "lng": 2.3522
+  },
+  "Brussels, Belgium": {
+    "lat": 50.8503,
+    "lng": 4.3517
+  },
+  "BRUSSELS, Belgium": {
+    "lat": 50.8503,
+    "lng": 4.3517
+  },
+  "Brussels, , Belgium": {
+    "lat": 50.8503,
+    "lng": 4.3517
+  },
+  "Berlin, Germany": {
+    "lat": 52.52,
+    "lng": 13.405
+  },
+  "BERLIN, Germany": {
+    "lat": 52.52,
+    "lng": 13.405
+  },
+  "Bogota, Colombia": {
+    "lat": 4.711,
+    "lng": -74.0721
+  },
+  "BOGOTA, Colombia": {
+    "lat": 4.711,
+    "lng": -74.0721
+  },
+  "Sao Paulo, Brazil": {
+    "lat": -23.5505,
+    "lng": -46.6333
+  },
+  "SAO PAULO, Brazil": {
+    "lat": -23.5505,
+    "lng": -46.6333
+  },
+  "Rio de Janeiro, Brazil": {
+    "lat": -22.9068,
+    "lng": -43.1729
+  },
+  "Kathmandu, Nepal": {
+    "lat": 27.7172,
+    "lng": 85.324
+  },
+  "Nairobi, Kenya": {
+    "lat": -1.2921,
+    "lng": 36.8219
+  },
+  "NAIROBI, Kenya": {
+    "lat": -1.2921,
+    "lng": 36.8219
+  },
+  "Beirut, Lebanon": {
+    "lat": 33.8938,
+    "lng": 35.5018
+  },
+  "Beirut, , Lebanon": {
+    "lat": 33.8938,
+    "lng": 35.5018
+  },
+  "Jerusalem, Israel": {
+    "lat": 31.7683,
+    "lng": 35.2137
+  },
+  "Johannesburg, South Africa": {
+    "lat": -26.2041,
+    "lng": 28.0473
+  },
+  "JOHANNESBURG, South Africa": {
+    "lat": -26.2041,
+    "lng": 28.0473
+  },
+  "Athens, Greece": {
+    "lat": 37.9838,
+    "lng": 23.7275
+  },
+  "Ramallah, Palestine": {
+    "lat": 31.8996,
+    "lng": 35.2042
+  },
+  "Ramallah,  OC": {
+    "lat": 31.8996,
+    "lng": 35.2042
+  },
+  "London, UK": {
+    "lat": 51.5074,
+    "lng": -0.1278
+  },
+  "LONDON,  UK": {
+    "lat": 51.5074,
+    "lng": -0.1278
+  },
+  "London,  UK": {
+    "lat": 51.5074,
+    "lng": -0.1278
+  },
+  "London,  OC": {
+    "lat": 51.5074,
+    "lng": -0.1278
+  },
+  "WASHINGTON, United States": {
+    "lat": 38.9072,
+    "lng": -77.0369
   }
 }
