@@ -742,6 +742,10 @@ function onPointClick(point, event) {
   const hasAmount = typeof point.totalAmount === 'number';
   const amountLabel = hasAmount ? formatCurrency(point.totalAmount) : 'Amount data not available';
   const yearLabel = point.yearLabel || (point.minYear === point.maxYear ? point.minYear : `${point.minYear}–${point.maxYear}`) || '';
+  const yearLines = (point.yearBreakdown || []).map(y => {
+    const total = y.total ? formatCurrency(y.total) : '';
+    return `<div class="panel-year">${y.year} (${y.count})${total ? ` · ${total}` : ''}</div>`;
+  }).join('');
   const grantList = grants.length
     ? grants.map(g => {
         const amount = g.amount ? formatCurrency(g.amount) : 'amount n/a';
@@ -755,7 +759,7 @@ function onPointClick(point, event) {
     <div class="panel-year">${point.grantCount} grants · ${point.metricLabel}</div>
     ${yearLabel ? `<div class="panel-year">Years: ${yearLabel}</div>` : ''}
     <div class="panel-year">Total amount: ${amountLabel}</div>
-    <div class="panel-amount">${amountLabel}</div>
+    ${yearLines}
     <div class="location">${point.loc || ''}</div>
     ${point.secondaryLabels && point.secondaryLabels.length ? `<div style="margin:8px 0;">Secondary: ${point.secondaryLabels.join(', ')}</div>` : ''}
     ${point.amountBands && point.amountBands.length ? `<div style="margin:8px 0;">Amount bands: ${point.amountBands.map(([band,count]) => `${band} (${count})`).join(', ')}</div>` : ''}
