@@ -165,6 +165,14 @@ let earliestYear = END_YEAR;
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
+// Manual geocode fixes for common misspellings or missing city entries.
+const MANUAL_GEOCODES = {
+  'Belguim': { lat: 50.8503, lng: 4.3517 },
+  'Belguim, Belgium': { lat: 50.8503, lng: 4.3517 },
+  'Belguim, , BE': { lat: 50.8503, lng: 4.3517 },
+  'Belgium, Belgium': { lat: 50.5039, lng: 4.4699 },
+  'Belgium': { lat: 50.5039, lng: 4.4699 }
+};
 
 const countryNameMap = {
   US: 'United States', USA: 'United States',
@@ -793,11 +801,13 @@ function onPointClick(point, event) {
   try {
     const resp = await fetch('geocodes.json');
     const data = await resp.json();
-    Object.assign(geocodes, data);
+    Object.assign(geocodes, data, MANUAL_GEOCODES);
     buildGeocodeLookup();
     console.log('Geocodes loaded');
   } catch (e) {
     console.warn('Failed to load geocodes.json', e);
+    Object.assign(geocodes, MANUAL_GEOCODES);
+    buildGeocodeLookup();
   }
 
   const fileWarning = document.getElementById('fileWarning');
