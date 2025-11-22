@@ -48,7 +48,7 @@
   <label id="yearLabel" for="yearSlider">Loading data…</label>
   <input id="yearSlider" type="range" min="2016" max="2025" step="1" value="2016" />
   <div style="margin-top:10px; color:#c2c8ff; font-size:13px;">
-    <div style="margin-bottom:6px; font-weight:700;">Bubble size</div>
+    <div style="margin-bottom:6px; font-weight:700;">Marker size</div>
     <label style="margin-right:8px;"><input type="radio" name="sizeMode" value="amount" checked /> total amount</label>
     <label><input type="radio" name="sizeMode" value="count" /> grant count</label>
   </div>
@@ -781,7 +781,7 @@ function renderPoints(maxYear) {
   if (!globeInstance) return;
   const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors);
   globeInstance.pointsData(points);
-  document.getElementById('yearLabel').textContent = `Showing grants through ${maxYear} · ${grantCount} grants · ${points.length} bubbles`;
+  document.getElementById('yearLabel').textContent = `Through ${maxYear} — ${grantCount.toLocaleString()} grants — ${points.length.toLocaleString()} markers`;
 }
 
 function onPointClick(point, event) {
