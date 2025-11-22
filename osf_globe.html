@@ -10,7 +10,9 @@
       --hybrid: #8888ff;
       --bg: #050010;
     }
-    body { margin:0; background:var(--bg); overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
+    body { margin:0; background:#000; overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
+    #bgLayer { position:fixed; inset:0; background:url('background.webp') center center / cover no-repeat; z-index:0; }
+    #globeViz { width:100vw; height:100vh; position:relative; z-index:1; }
     #globeViz { width:100vw; height:100vh; }
     #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,10,20,0.6); color:#fff; padding:24px; box-sizing:border-box; overflow-y:auto; border-left:2px solid rgba(255,0,255,0.35); display:none; box-shadow:none; backdrop-filter:blur(3px); }
     #close { position:absolute; top:12px; left:12px; font-size:28px; cursor:pointer; color:var(--magenta); font-weight:bold; }
@@ -39,6 +41,7 @@
   <script src="papaparse.min.js"></script>
 </head>
 <body>
+<div id="bgLayer"></div>
 <div id="globeViz"></div>
 <button id="toggleControls" onclick="toggleControls()">Show Controls</button>
 <div id="controls">
