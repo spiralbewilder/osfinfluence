@@ -2424,8 +2424,8 @@
     "lng": 18.0161398
   },
   "Belguim, , BE": {
-    "lat": 45.79184035,
-    "lng": -97.7163721
+    "lat": 50.8503,
+    "lng": 4.3517
   },
   "One Federal Street": {
     "lat": 42.35614825,
@@ -15750,5 +15750,25 @@
   "HENRIQUE MONTEIRO STREET": {
     "lat": 39.659210099999996,
     "lng": -8.825827514662743
+  },
+  "Belguim": {
+    "lat": 50.8503,
+    "lng": 4.3517
+  },
+  "Belguim, Belgium": {
+    "lat": 50.8503,
+    "lng": 4.3517
+  },
+  "Belgium, Belgium": {
+    "lat": 50.5039,
+    "lng": 4.4699
+  },
+  "Belgium": {
+    "lat": 50.5039,
+    "lng": 4.4699
+  },
+  "Berlin, Gambia": {
+    "lat": 13.4432,
+    "lng": -16.5758
   }
 }
