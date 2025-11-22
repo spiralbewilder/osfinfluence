@@ -754,6 +754,7 @@ function onPointClick(point, event) {
     <div class="chip" style="background:${point.sector_color}; color:#000;">${point.sector_primary}</div>
     <div class="panel-year">${point.grantCount} grants · ${point.metricLabel}</div>
     ${yearLabel ? `<div class="panel-year">Years: ${yearLabel}</div>` : ''}
+    <div class="panel-year">Total amount: ${amountLabel}</div>
     <div class="panel-amount">${amountLabel}</div>
     <div class="location">${point.loc || ''}</div>
     ${point.secondaryLabels && point.secondaryLabels.length ? `<div style="margin:8px 0;">Secondary: ${point.secondaryLabels.join(', ')}</div>` : ''}
