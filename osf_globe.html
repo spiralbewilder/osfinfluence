@@ -191,6 +191,11 @@ const MANUAL_GEOCODES = {
   'Tel Aviv, Israel': { lat: 32.0853, lng: 34.7818 },
   'Tel Aviv, IS': { lat: 32.0853, lng: 34.7818 },
   'Tel Aviv, ISR': { lat: 32.0853, lng: 34.7818 },
+  'Zug': { lat: 47.1662, lng: 8.5155 },
+  'Zug, Switzerland': { lat: 47.1662, lng: 8.5155 },
+  'Zug, SZ': { lat: 47.1662, lng: 8.5155 },
+  'Zug, , CH': { lat: 47.1662, lng: 8.5155 },
+  'Zug, CH': { lat: 47.1662, lng: 8.5155 },
   'Guaynabo': { lat: 18.3617, lng: -66.1100 },
   'Guaynabo, PR': { lat: 18.3617, lng: -66.1100 },
   'Loiza': { lat: 18.4322, lng: -65.8782 },
@@ -381,7 +386,11 @@ const cityFallbacks = {
   'kent, united kingdom': { lat: 51.2787, lng: 0.5217 },
   'kent': { lat: 51.2787, lng: 0.5217 },
   'berlin': { lat: 52.52, lng: 13.405 },
-  'berlin, gambia': { lat: 13.4432, lng: -16.5758 }
+  'berlin, gambia': { lat: 13.4432, lng: -16.5758 },
+  'zug': { lat: 47.1662, lng: 8.5155 },
+  'zug, switzerland': { lat: 47.1662, lng: 8.5155 },
+  'zug, ch': { lat: 47.1662, lng: 8.5155 },
+  'zug, , ch': { lat: 47.1662, lng: 8.5155 }
 };
 
 async function getCoords(location) {
