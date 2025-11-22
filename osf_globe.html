@@ -170,6 +170,10 @@ let earliestYear = END_YEAR;
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
+// Recipients whose work spans multiple sectors; force them to Other so they do not dominate a single-sector filter.
+const RECIPIENT_SECTOR_OVERRIDE = [
+  'open society foundation for south africa'
+];
 // Manual geocode fixes for common misspellings or missing city entries.
 const MANUAL_GEOCODES = {
   'Belguim': { lat: 50.8503, lng: 4.3517 },
