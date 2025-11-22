@@ -813,6 +813,25 @@ function onPointClick(point, event) {
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
 
+  if (countriesGeo.length) {
+    globeInstance
+      .polygonsData(countriesGeo)
+      .polygonCapColor(() => 'rgba(0,0,0,0)')
+      .polygonSideColor(() => 'rgba(0,0,0,0)')
+      .polygonStrokeColor(() => 'rgba(255,255,255,0.28)')
+      .polygonAltitude(0.002);
+  }
+
+  if (statesGeo.length) {
+    const combined = statesGeo.concat(countriesGeo);
+    globeInstance
+      .polygonsData(combined)
+      .polygonCapColor(() => 'rgba(0,0,0,0)')
+      .polygonSideColor(() => 'rgba(0,0,0,0)')
+      .polygonStrokeColor(f => (f.properties && f.properties.STATE ? 'rgba(0,180,255,0.45)' : 'rgba(255,255,255,0.28)'))
+      .polygonAltitude(f => (f.properties && f.properties.STATE ? 0.003 : 0.002));
+  }
+
   // Enable rotation
   globeInstance.controls().enableRotate = true;
   for (const g of grants) {
