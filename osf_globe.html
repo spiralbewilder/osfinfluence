@@ -162,6 +162,7 @@ let activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 let earliestYear = END_YEAR;
 let sorosTexture = null;
 let sorosSpriteLayer = null;
+const geocodeLookup = new Map();
 
 const countryNameMap = {
   US: 'United States', USA: 'United States',
