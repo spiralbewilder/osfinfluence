@@ -1,0 +1,44 @@
+# Agents Guide – OSF Grants Globe
+
+## Objective
+- Build and maintain a professional, easy-to-use visualization of OSF/Soros-funded grantees worldwide on an interactive 3D globe (`osf_globe.html`).
+- Show locations at city/region level only—never display specific street addresses.
+- Prioritize clarity: simple controls, quick load times, and intuitive filtering.
+
+## Data & Privacy
+- Use provided CSVs (`2020.csv`–`2023.csv`) and precomputed geo data (`geocodes.json`, `grantees.json`). Run `python process_grantees.py 2020.csv 2021.csv 2022.csv 2023.csv > geocodes.json` when regenerating.
+- Keep all processing local; do not call external APIs in the browser experience.
+- Strip or aggregate any street-level detail before display. City/region + country is acceptable.
+- Cache geocoding locally (`geocode_cache.json`); avoid new external geocode calls unless explicitly approved.
+
+## Visualization Requirements
+- 3D globe using Globe.gl + Three.js (`globe.gl.min.js`, `three.min.js`), bundled locally to avoid CDN issues.
+- Bubbles/points represent grants:
+  - Color by primary sector; keep a clear, limited palette.
+  - Size toggles between total amount and grant count.
+  - Tooltip/panel shows recipient, year, sector, amount, location (non-street), and purpose/notes.
+- Keep performance tight: load in seconds; no runtime geocoding.
+
+## Interaction & UX
+- Controls live in the sidebar (toggle button in the viewport):
+  - Year slider filters grants up to the selected year.
+  - Radio toggle for size mode (amount vs. count).
+  - Sector filters with checkboxes and swatches; allow multi-select.
+- Ensure the globe remains visible; controls should not permanently cover it.
+- Responsive layout: desktop and mobile friendly. Sidebar can slide or become a bottom sheet on small screens.
+- Accessibility: keyboard-friendly focus order, high-contrast colors, legible type.
+
+## Setup & Run
+- Serve files over HTTP locally (e.g., `python -m http.server 8000`) from the project directory; avoid `file://` to prevent blocked asset loads.
+- Required files in the same directory: `osf_globe.html`, `three.min.js`, `globe.gl.min.js`, `papaparse.min.js`, `geocodes.json`, `grantees.json` (or CSVs for fallback parsing).
+- Open `http://localhost:8000/osf_globe.html` to validate changes.
+
+## Quality Checks Before Handoff
+- Verify data loads without console errors; confirm bubbles render and respond to sector filters, size mode, and year slider.
+- Click multiple bubbles to confirm detail panel content and absence of street-level exposure.
+- Test both amount and count sizing for sensible relative scales.
+- Confirm performance is acceptable on first load and after filter changes.
+
+## Change Notes
+- Keep styles minimal and purposeful; avoid visual clutter.
+- Document any new controls or data assumptions directly in `osf_globe.html` comments if non-obvious.
