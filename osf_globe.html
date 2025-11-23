@@ -1074,17 +1074,6 @@ function onPointClick(point, event) {
       .polygonAltitude(f => (f.properties && f.properties.STATE ? 0.003 : 0.002));
   }
 
-  if (SPIN_MODE) {
-    const ctrl = globeInstance.controls();
-    ctrl.autoRotate = true;
-    ctrl.autoRotateSpeed = 0.3;
-    globeInstance.camera().position.set(0, 0, 220);
-    ['controls', 'toggleControls', 'panel'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-  }
-
   // Enable rotation
   globeInstance.controls().enableRotate = true;
   for (const g of grants) {
@@ -1200,6 +1189,21 @@ function onPointClick(point, event) {
   renderPoints(END_YEAR);
   document.getElementById('yearLabel').textContent = 'Year: ' + slider.value;
   document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
+
+  if (globeInstance) {
+    const ctrl = globeInstance.controls();
+    if (SPIN_MODE) {
+      ctrl.autoRotate = true;
+      ctrl.autoRotateSpeed = 0.3;
+      globeInstance.camera().position.set(0, 0, 220);
+      ['controls', 'toggleControls', 'panel'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    } else {
+      ctrl.autoRotate = false;
+    }
+  }
 })();
 
 } // end non-file protocol guard
