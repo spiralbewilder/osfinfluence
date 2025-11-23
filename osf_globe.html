@@ -82,6 +82,7 @@ const OTHER_LABEL = 'Other / Unclear';
 const isFileProtocol = window.location.protocol === 'file:';
 const geocodeCache = new Map();
 const geocodes = {};
+const SPIN_MODE = new URLSearchParams(window.location.search).get('spin') === '1';
 const fallbackCoords = {
   "United States": { lat: 39.8283, lng: -98.5795 },
   "USA": { lat: 39.8283, lng: -98.5795 },
