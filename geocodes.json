@@ -15994,5 +15994,9 @@
   "New York, NY, USA": {
     "lat": 40.7128,
     "lng": -74.006
+  },
+  "Durban, South Africa": {
+    "lat": -29.8587,
+    "lng": 31.0218
   }
 }
