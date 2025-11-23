@@ -1197,10 +1197,6 @@ function onPointClick(point, event) {
       ctrl.autoRotate = true;
       ctrl.autoRotateSpeed = 0.3;
       globeInstance.camera().position.set(0, 0, 220);
-      ['controls', 'toggleControls', 'panel'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
     } else {
       ctrl.autoRotate = false;
     }
