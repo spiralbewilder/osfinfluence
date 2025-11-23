@@ -856,7 +856,26 @@ function buildGeocodeLookup() {
   Object.entries(geocodes).forEach(([k, v]) => geocodeLookup.set(k.toLowerCase(), v));
 }
 
-function aggregatePoints(maxYear, sizeMode, sectorFilter) {
+function computeGlobalMax(sectorFilter) {
+  if (!allPoints.length) return { maxAmount: 1, maxCount: 1 };
+  const buckets = new Map();
+  allPoints.forEach(g => {
+    if (!sectorFilter.has(g.sector_primary)) return;
+    const key = `${g.loc}|${g.sector_primary}`;
+    const bucket = buckets.get(key) || { totalAmount: 0, grantCount: 0 };
+    const amt = Number(g.amount) || 0;
+    bucket.totalAmount += amt;
+    bucket.grantCount += 1;
+    buckets.set(key, bucket);
+  });
+  const vals = Array.from(buckets.values());
+  return {
+    maxAmount: Math.max(...vals.map(v => v.totalAmount), 1),
+    maxCount: Math.max(...vals.map(v => v.grantCount), 1)
+  };
+}
+
+function aggregatePoints(maxYear, sizeMode, sectorFilter, maxMetrics) {
   if (!allPoints.length) return { points: [], grantCount: 0 };
 
   const withinYear = allPoints.filter(g => g.year <= maxYear && sectorFilter.has(g.sector_primary));
@@ -916,7 +935,9 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
   });
 
   const values = Array.from(buckets.values());
-  const maxMetric = Math.max(...values.map(v => sizeMode === 'amount' ? v.totalAmount : v.grantCount), 1);
+  const maxMetric = sizeMode === 'amount'
+    ? (maxMetrics?.maxAmount || Math.max(...values.map(v => v.totalAmount), 1))
+    : (maxMetrics?.maxCount || Math.max(...values.map(v => v.grantCount), 1));
   values.forEach(v => {
     v.secondaryLabels = [...v.secondaries].filter(Boolean);
     v.amountBands = Array.from(v.amountBands.entries());
@@ -950,7 +971,8 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter) {
 
 function renderPoints(maxYear) {
   if (!globeInstance) return;
-  const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors);
+  const maxMetrics = computeGlobalMax(activeSectors);
+  const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors, maxMetrics);
   globeInstance.pointsData(points);
   document.getElementById('yearLabel').textContent = `Through ${maxYear} — ${grantCount.toLocaleString()} grants — ${points.length.toLocaleString()} markers`;
 }
