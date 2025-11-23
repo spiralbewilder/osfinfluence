@@ -15978,5 +15978,13 @@
   "Providencia Isla, Colombia": {
     "lat": 13.3531,
     "lng": -81.3749
+  },
+  "Providencia Isla, , CO": {
+    "lat": 13.3531,
+    "lng": -81.3749
+  },
+  "Providencia Isla, CO": {
+    "lat": 13.3531,
+    "lng": -81.3749
   }
 }
