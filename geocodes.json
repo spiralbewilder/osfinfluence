@@ -15986,5 +15986,13 @@
   "Providencia Isla, CO": {
     "lat": 13.3531,
     "lng": -81.3749
+  },
+  "New York, NY, United States": {
+    "lat": 40.7128,
+    "lng": -74.006
+  },
+  "New York, NY, USA": {
+    "lat": 40.7128,
+    "lng": -74.006
   }
 }
