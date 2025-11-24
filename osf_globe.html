@@ -192,6 +192,7 @@ let sliderEl = null;
 const sectorInputs = [];
 let sizeModeRadios = [];
 let lastHoveredPoint = null;
+let lastHoverTime = 0;
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
@@ -1132,16 +1133,18 @@ function onPointClick(point, event) {
     .pointAltitude(p => 0.00005 + Math.min(0.32, Math.pow(Math.max(p.radius || 0.02, 0.01), 1.8) * 0.9))
     .pointRadius(p => Math.max(0.01, Math.min(0.5, p.radius || 0.05)))
     .onPointClick(onPointClick)
-    .onPointHover((pt) => { lastHoveredPoint = pt; })
+    .onPointHover((pt) => { lastHoveredPoint = pt; lastHoverTime = Date.now(); })
     (document.getElementById('globeViz'));
   // Ensure taps/clicks register on mobile Safari.
   globeInstance.enablePointerInteraction(true);
 
-  // Fallback tap handler for touch devices: use the last hovered point on touchend/pointerup.
+  // Fallback tap handler for touch devices: use a recent hovered point only.
   const globeCanvas = globeInstance.renderer().domElement;
   ['touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(evt => {
     globeCanvas.addEventListener(evt, () => {
-      if (lastHoveredPoint) onPointClick(lastHoveredPoint);
+      if (lastHoveredPoint && Date.now() - lastHoverTime < 800) {
+        onPointClick(lastHoveredPoint);
+      }
     }, { passive: true });
   });
 
@@ -1282,6 +1285,9 @@ function onPointClick(point, event) {
 
   if (globeInstance) {
     const ctrl = globeInstance.controls();
+    if (ctrl && ctrl.addEventListener) {
+      ctrl.addEventListener('start', () => { lastHoveredPoint = null; lastHoverTime = 0; });
+    }
     if (SPIN_MODE) {
       ctrl.autoRotate = true;
       ctrl.autoRotateSpeed = 0.9;
