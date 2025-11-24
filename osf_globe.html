@@ -984,38 +984,43 @@ function onPointClick(point, event) {
   const content = document.getElementById('content');
   if (!panel || !title || !content) return;
 
-  const fileWarning = document.getElementById('fileWarning');
-  if (fileWarning) fileWarning.remove();
-  panel.style.background = 'rgba(10,10,20,0.6)';
+  try {
+    const fileWarning = document.getElementById('fileWarning');
+    if (fileWarning) fileWarning.remove();
+    panel.style.background = 'rgba(10,10,20,0.6)';
+    panel.style.display = 'block';
 
-  const grants = point.grants || [];
-  const hasAmount = typeof point.totalAmount === 'number';
-  const amountLabel = hasAmount ? formatCurrency(point.totalAmount) : 'Amount data not available';
-  const yearLabel = point.yearLabel || (point.minYear === point.maxYear ? point.minYear : `${point.minYear}–${point.maxYear}`) || '';
-  const yearLines = (point.yearBreakdown || []).map(y => {
-    const total = y.total ? formatCurrency(y.total) : '';
-    return `<div class="panel-year">${y.year} (${y.count})${total ? ` · ${total}` : ''}</div>`;
-  }).join('');
-  const grantList = grants.length
-    ? grants.map(g => {
-        const amount = g.amount ? formatCurrency(g.amount) : 'amount n/a';
-        return `<div style="margin-bottom:10px;"><strong>${g.name || 'Recipient'}</strong>${g.year ? ` · ${g.year}` : ''} · ${amount}${g.purpose ? `<div class="panel-purpose">${g.purpose}</div>` : ''}</div>`;
-      }).join('')
-    : '<div class="panel-purpose">No per-grant detail captured for this bucket.</div>';
+    const grants = point.grants || [];
+    const hasAmount = typeof point.totalAmount === 'number';
+    const amountLabel = hasAmount ? formatCurrency(point.totalAmount) : 'Amount data not available';
+    const yearLabel = point.yearLabel || (point.minYear === point.maxYear ? point.minYear : `${point.minYear}–${point.maxYear}`) || '';
+    const yearLines = (point.yearBreakdown || []).map(y => {
+      const total = y.total ? formatCurrency(y.total) : '';
+      return `<div class="panel-year">${y.year} (${y.count})${total ? ` · ${total}` : ''}</div>`;
+    }).join('');
+    const grantList = grants.length
+      ? grants.map(g => {
+          const amount = g.amount ? formatCurrency(g.amount) : 'amount n/a';
+          return `<div style="margin-bottom:10px;"><strong>${g.name || 'Recipient'}</strong>${g.year ? ` · ${g.year}` : ''} · ${amount}${g.purpose ? `<div class="panel-purpose">${g.purpose}</div>` : ''}</div>`;
+        }).join('')
+      : '<div class="panel-purpose">No per-grant detail captured for this bucket.</div>';
 
-  title.textContent = point.loc || 'Grant location';
-  content.innerHTML = `
-    <div class="chip" style="background:${point.sector_color}; color:#000;">${point.sector_primary}</div>
-    <div class="panel-year">${point.grantCount} grants · ${point.metricLabel}</div>
-    ${yearLabel ? `<div class="panel-year">Years: ${yearLabel}</div>` : ''}
-    <div class="panel-year">Total amount: ${amountLabel}</div>
-    ${yearLines}
-    <div class="location">${point.loc || ''}</div>
-    ${point.secondaryLabels && point.secondaryLabels.length ? `<div style="margin:8px 0;">Secondary: ${point.secondaryLabels.join(', ')}</div>` : ''}
-    ${point.amountBands && point.amountBands.length ? `<div style="margin:8px 0;">Amount bands: ${point.amountBands.map(([band,count]) => `${band} (${count})`).join(', ')}</div>` : ''}
-    <div style="margin-top:12px;">${grantList}</div>
-  `;
-  panel.style.display = 'block';
+    title.textContent = point.loc || 'Grant location';
+    content.innerHTML = `
+      <div class="chip" style="background:${point.sector_color}; color:#000;">${point.sector_primary}</div>
+      <div class="panel-year">${point.grantCount} grants · ${point.metricLabel}</div>
+      ${yearLabel ? `<div class="panel-year">Years: ${yearLabel}</div>` : ''}
+      <div class="panel-year">Total amount: ${amountLabel}</div>
+      ${yearLines}
+      <div class="location">${point.loc || ''}</div>
+      ${point.secondaryLabels && point.secondaryLabels.length ? `<div style="margin:8px 0;">Secondary: ${point.secondaryLabels.join(', ')}</div>` : ''}
+      ${point.amountBands && point.amountBands.length ? `<div style="margin:8px 0;">Amount bands: ${point.amountBands.map(([band,count]) => `${band} (${count})`).join(', ')}</div>` : ''}
+      <div style="margin-top:12px;">${grantList}</div>
+    `;
+  } catch (err) {
+    console.error('onPointClick failed', err, point);
+    panel.style.display = 'none';
+  }
 }
 
 (async function init() {
