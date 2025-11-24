@@ -191,6 +191,7 @@ let earliestYear = END_YEAR;
 let sliderEl = null;
 const sectorInputs = [];
 let sizeModeRadios = [];
+let lastHoveredPoint = null;
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
@@ -1131,9 +1132,18 @@ function onPointClick(point, event) {
     .pointAltitude(p => 0.00005 + Math.min(0.32, Math.pow(Math.max(p.radius || 0.02, 0.01), 1.8) * 0.9))
     .pointRadius(p => Math.max(0.01, Math.min(0.5, p.radius || 0.05)))
     .onPointClick(onPointClick)
+    .onPointHover((pt) => { lastHoveredPoint = pt; })
     (document.getElementById('globeViz'));
   // Ensure taps/clicks register on mobile Safari.
   globeInstance.enablePointerInteraction(true);
+
+  // Fallback tap handler for touch devices: use the last hovered point on touchend/pointerup.
+  const globeCanvas = globeInstance.renderer().domElement;
+  ['touchend', 'pointerup'].forEach(evt => {
+    globeCanvas.addEventListener(evt, () => {
+      if (lastHoveredPoint) onPointClick(lastHoveredPoint);
+    }, { passive: true });
+  });
 
   const allPolys = [...(countriesGeo || []), ...(statesGeo || [])];
   if (allPolys.length) {
