@@ -23,8 +23,8 @@
     .panel-purpose { margin:12px 0; }
     .chip { display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; letter-spacing:0.2px; text-transform:uppercase; font-weight:700; margin-bottom:10px; }
     .location { font-style:italic; color:#c9c9ff; }
-    #controls { position:fixed; top:0; right:0; width:320px; height:100vh; background:rgba(10,0,30,0.95); border-left:2px solid rgba(255,0,255,0.35); color:#fff; box-shadow:-10px 0 30px rgba(255,0,255,0.25); backdrop-filter:blur(4px); transform:translateX(100%); transition:transform 0.3s ease; z-index:1000; overflow-y:auto; padding:20px; }
-    #controls.open { transform:translateX(0); }
+    #controls { position:fixed; top:0; right:0; width:320px; height:100vh; background:rgba(10,0,30,0.95); border-left:2px solid rgba(255,0,255,0.35); color:#fff; box-shadow:-10px 0 30px rgba(255,0,255,0.25); backdrop-filter:blur(4px); transform:translateX(100%); transition:transform 0.3s ease; z-index:1000; overflow-y:auto; padding:20px; pointer-events:none; }
+    #controls.open { transform:translateX(0); pointer-events:auto; }
     #globeViz { transition:margin-right 0.3s ease; }
     #globeViz.sidebar-open { margin-right:320px; }
     #toggleControls { position:absolute; top:16px; left:16px; padding:8px 12px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); cursor:pointer; z-index:1001; }
@@ -1028,6 +1028,7 @@ function onPointClick(point, event) {
     if (fileWarning) fileWarning.remove();
     panel.style.background = 'rgba(10,10,20,0.6)';
     panel.style.display = 'block';
+    panel.style.pointerEvents = 'auto';
     panel.scrollTop = 0;
 
     const grants = point.grants || [];
@@ -1261,7 +1262,13 @@ function onPointClick(point, event) {
 
   renderPoints(END_YEAR);
   document.getElementById('yearLabel').textContent = 'Year: ' + sliderEl.value;
-  document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
+  document.getElementById('close').onclick = () => {
+    const p = document.getElementById('panel');
+    if (p) {
+      p.style.display = 'none';
+      p.style.pointerEvents = 'none';
+    }
+  };
 
   if (globeInstance) {
     const ctrl = globeInstance.controls();
