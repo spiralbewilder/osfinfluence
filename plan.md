@@ -38,3 +38,8 @@ Performance: Loads quickly, handles data volume without lag.
 Accuracy: Locations are correctly mapped; sectors are categorized based on grant purposes.
 Completeness: Covers all provided grant data with proper aggregation and visualization.
 This creates an engaging, educational tool for understanding global grant distributions, highlighting OSF's impact across sectors and regions. If any aspect isn't aligned, provide feedback for refinement!
+
+Ease-of-use ideas to consider next
+- Add a short hint near the year slider explaining it shows grants up to the selected year.
+- Provide a one-click “reset filters” control to restore year, size mode, and sector defaults.
+- On mobile, offer a bottom-sheet version of the detail panel to keep the globe visible.

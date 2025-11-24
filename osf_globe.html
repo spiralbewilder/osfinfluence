@@ -12,7 +12,7 @@
     }
     body { margin:0; background:#000; overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
     #bgLayer { position:fixed; inset:0; background:url('background.png') center center / cover no-repeat; z-index:0; pointer-events:none; }
-    #globeViz { width:100vw; height:100vh; position:relative; z-index:1; }
+    #globeViz { width:100vw; height:100vh; position:relative; z-index:3; }
     #globeViz { width:100vw; height:100vh; }
     #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,10,20,0.6); color:#fff; padding:24px; box-sizing:border-box; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-left:2px solid rgba(255,0,255,0.35); display:none; box-shadow:none; backdrop-filter:blur(3px); z-index:1002; }
     #close { position:absolute; top:12px; left:12px; font-size:28px; cursor:pointer; color:var(--magenta); font-weight:bold; }
@@ -27,15 +27,29 @@
     #controls.open { transform:translateX(0); }
     #globeViz { transition:margin-right 0.3s ease; }
     #globeViz.sidebar-open { margin-right:320px; }
-    #toggleControls { position:absolute; top:16px; left:16px; padding:8px 12px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); cursor:pointer; z-index:1001; }
-    #titleBadge { position:absolute; top:56px; left:16px; padding:8px 12px; background:rgba(20,0,40,0.78); border:1px solid rgba(136,136,255,0.45); border-radius:10px; color:#cce4ff; font-weight:700; letter-spacing:0.3px; box-shadow:0 0 12px rgba(0,200,255,0.18); z-index:1001; pointer-events:none; }
+    #toggleControls { position:absolute; top:16px; left:16px; padding:8px 12px; background:rgba(10,0,30,0.85); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#fff; box-shadow:0 0 15px rgba(0,255,255,0.2); backdrop-filter:blur(4px); cursor:pointer; z-index:2; }
+    #titleBadge { position:absolute; top:56px; left:16px; padding:8px 12px; background:rgba(20,0,40,0.78); border:1px solid rgba(136,136,255,0.45); border-radius:10px; color:#cce4ff; font-weight:700; letter-spacing:0.3px; box-shadow:0 0 12px rgba(0,200,255,0.18); z-index:1; pointer-events:auto; line-height:1.35; }
+    #titleBadge a { color:#9ad1ff; text-decoration:underline; }
     #yearLabel { margin-bottom:8px; display:block; font-weight:700; letter-spacing:0.3px; color:#c2c8ff; }
     #yearSlider { width:260px; accent-color:var(--magenta); }
+    #yearHint { margin-top:4px; font-size:12px; color:#98a2ff; }
+    #resetFilters { margin-top:12px; padding:8px 10px; background:rgba(10,30,60,0.8); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#e8ecff; cursor:pointer; width:100%; text-align:center; }
+    #resetFilters:hover { background:rgba(20,40,80,0.9); }
+    #mainHint { position:absolute; top:104px; left:16px; max-width:320px; padding:8px 10px; background:rgba(20,0,40,0.72); border:1px solid rgba(136,136,255,0.35); border-radius:10px; color:#dfe6ff; font-size:12px; line-height:1.4; z-index:1; box-shadow:0 0 12px rgba(0,200,255,0.18); }
     #fileWarning { position:fixed; inset:0; background:rgba(5,0,16,0.96); color:#fff; display:none; align-items:center; justify-content:center; text-align:left; padding:48px; box-sizing:border-box; z-index:10; }
     #fileWarning .box { max-width:720px; border:1px solid rgba(255,0,255,0.35); background:rgba(20,0,40,0.85); box-shadow:0 0 30px rgba(0,255,255,0.25); padding:28px; border-radius:12px; }
     #fileWarning h1 { margin-top:0; margin-bottom:12px; font-size:26px; color:#ff7bff; }
     #fileWarning ol { margin:12px 0; padding-left:20px; }
     #fileWarning code { background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:6px; }
+    @media (max-width: 768px) {
+      #controls { width:100%; right:auto; left:0; height:auto; max-height:65vh; bottom:0; top:auto; transform:translateY(100%); }
+      #controls.open { transform:translateY(0); }
+      #globeViz.sidebar-open { margin-right:0; }
+      #panel { width:100%; height:50vh; left:0; right:0; top:auto; bottom:0; border-left:none; border-top:2px solid rgba(255,0,255,0.35); border-radius:12px 12px 0 0; }
+      #toggleControls { top:12px; left:12px; }
+      #titleBadge { top:52px; left:12px; }
+      #mainHint { top:96px; left:12px; max-width:calc(100% - 24px); }
+    }
   </style>
   <script src="three.min.js"></script>
   <script src="globe.gl.min.js"></script>
@@ -45,10 +59,16 @@
 <div id="bgLayer"></div>
 <div id="globeViz"></div>
 <button id="toggleControls" onclick="toggleControls()">Show Controls</button>
-<div id="titleBadge">OSF/Soros Grantees 2020–2023</div>
+<div id="titleBadge">
+  OSF/Soros Grantees 2020–2023<br>
+  <span style="font-weight:600; font-size:12px;">(pulled from 990s and schedules from <a href="https://projects.propublica.org/nonprofits/organizations/137029285" target="_blank" rel="noopener noreferrer">ProPublica</a>)</span>
+</div>
+<div id="mainHint">Tip: click a ray/marker to see grant details in the side panel.</div>
 <div id="controls">
   <label id="yearLabel" for="yearSlider">Loading data…</label>
   <input id="yearSlider" type="range" min="2016" max="2025" step="1" value="2016" />
+  <div id="yearHint">Shows grants up to the selected year.</div>
+  <button id="resetFilters" type="button" onclick="resetFilters()">Clear filters</button>
   <div style="margin-top:10px; color:#c2c8ff; font-size:13px;">
     <div style="margin-bottom:6px; font-weight:700;">Marker size</div>
     <label style="margin-right:8px;"><input type="radio" name="sizeMode" value="amount" checked /> total amount</label>
@@ -168,6 +188,9 @@ let allPoints = [];
 let sizeMode = 'amount';
 let activeSectors = new Set(SECTOR_RULES.map(r => r.label));
 let earliestYear = END_YEAR;
+let sliderEl = null;
+const sectorInputs = [];
+let sizeModeRadios = [];
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
@@ -971,10 +994,25 @@ function aggregatePoints(maxYear, sizeMode, sectorFilter, maxMetrics) {
 
 function renderPoints(maxYear) {
   if (!globeInstance) return;
+  if (!activeSectors.size) {
+    globeInstance.pointsData([]);
+    document.getElementById('yearLabel').textContent = `Through ${maxYear} — 0 grants — 0 markers (select sectors)`;
+    return;
+  }
   const maxMetrics = computeGlobalMax(activeSectors);
   const { points, grantCount } = aggregatePoints(maxYear, sizeMode, activeSectors, maxMetrics);
   globeInstance.pointsData(points);
   document.getElementById('yearLabel').textContent = `Through ${maxYear} — ${grantCount.toLocaleString()} grants — ${points.length.toLocaleString()} markers`;
+}
+
+function resetFilters() {
+  if (!sliderEl) return;
+  sizeMode = 'amount';
+  sizeModeRadios.forEach(r => { r.checked = r.value === 'amount'; });
+  activeSectors = new Set(); // empty to show no markers until user re-enables
+  sectorInputs.forEach(input => { input.checked = false; });
+  sliderEl.value = END_YEAR;
+  renderPoints(END_YEAR);
 }
 
 function onPointClick(point, event) {
@@ -1149,7 +1187,7 @@ function onPointClick(point, event) {
     input.checked = true;
     input.onchange = () => {
       if (input.checked) activeSectors.add(rule.label); else activeSectors.delete(rule.label);
-      renderPoints(+slider.value);
+      renderPoints(+sliderEl.value);
     };
     const swatch = document.createElement('span');
     swatch.style.display = 'inline-block';
@@ -1158,6 +1196,7 @@ function onPointClick(point, event) {
     swatch.style.background = rule.color;
     swatch.style.margin = '0 6px';
     swatch.style.borderRadius = '50%';
+    sectorInputs.push(input);
     label.appendChild(input);
     label.appendChild(swatch);
     label.appendChild(document.createTextNode(rule.label));
@@ -1184,7 +1223,7 @@ function onPointClick(point, event) {
     input.checked = true;
     input.onchange = () => {
       if (input.checked) activeSectors.add(rule.label); else activeSectors.delete(rule.label);
-      renderPoints(+slider.value);
+      renderPoints(+sliderEl.value);
     };
     const swatch = document.createElement('span');
     swatch.style.display = 'inline-block';
@@ -1193,6 +1232,7 @@ function onPointClick(point, event) {
     swatch.style.background = rule.color;
     swatch.style.margin = '0 6px';
     swatch.style.borderRadius = '50%';
+    sectorInputs.push(input);
     label.appendChild(input);
     label.appendChild(swatch);
     label.appendChild(document.createTextNode(rule.label));
@@ -1202,22 +1242,23 @@ function onPointClick(point, event) {
   filtersContainer.appendChild(primaryDetails);
   filtersContainer.appendChild(fallbackDetails);
 
-  document.querySelectorAll('input[name="sizeMode"]').forEach(radio => {
-    radio.onchange = () => { sizeMode = radio.value; renderPoints(+slider.value); };
+  sizeModeRadios = Array.from(document.querySelectorAll('input[name="sizeMode"]'));
+  sizeModeRadios.forEach(radio => {
+    radio.onchange = () => { sizeMode = radio.value; renderPoints(+sliderEl.value); };
   });
   const checkedSize = document.querySelector('input[name="sizeMode"]:checked');
   if (checkedSize) sizeMode = checkedSize.value;
 
-  const slider = document.getElementById('yearSlider');
+  sliderEl = document.getElementById('yearSlider');
   const minYear = Math.max(START_YEAR, Math.min(earliestYear, END_YEAR));
-  slider.min = String(minYear);
-  slider.max = String(END_YEAR);
-  slider.value = END_YEAR;
-  slider.oninput = () => renderPoints(+slider.value);
-  slider.onchange = () => renderPoints(+slider.value);
+  sliderEl.min = String(minYear);
+  sliderEl.max = String(END_YEAR);
+  sliderEl.value = END_YEAR;
+  sliderEl.oninput = () => renderPoints(+sliderEl.value);
+  sliderEl.onchange = () => renderPoints(+sliderEl.value);
 
   renderPoints(END_YEAR);
-  document.getElementById('yearLabel').textContent = 'Year: ' + slider.value;
+  document.getElementById('yearLabel').textContent = 'Year: ' + sliderEl.value;
   document.getElementById('close').onclick = () => document.getElementById('panel').style.display = 'none';
 
   if (globeInstance) {
