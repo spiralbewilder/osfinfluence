@@ -1286,9 +1286,6 @@ function onPointClick(point, event) {
 
   if (globeInstance) {
     const ctrl = globeInstance.controls();
-    if (ctrl && ctrl.addEventListener) {
-      ctrl.addEventListener('start', () => { lastHoveredPoint = null; lastHoverTime = 0; });
-    }
     if (SPIN_MODE) {
       ctrl.autoRotate = true;
       ctrl.autoRotateSpeed = 0.9;
