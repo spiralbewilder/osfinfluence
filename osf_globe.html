@@ -35,7 +35,7 @@
     #yearHint { margin-top:4px; font-size:12px; color:#98a2ff; }
     #resetFilters { margin-top:12px; padding:8px 10px; background:rgba(10,30,60,0.8); border:1px solid rgba(255,0,255,0.35); border-radius:8px; color:#e8ecff; cursor:pointer; width:100%; text-align:center; }
     #resetFilters:hover { background:rgba(20,40,80,0.9); }
-    #mainHint { position:absolute; top:104px; left:16px; max-width:320px; padding:8px 10px; background:rgba(20,0,40,0.72); border:1px solid rgba(136,136,255,0.35); border-radius:10px; color:#dfe6ff; font-size:12px; line-height:1.4; z-index:1; box-shadow:0 0 12px rgba(0,200,255,0.18); }
+    #mainHint { position:absolute; top:104px; left:16px; max-width:320px; padding:8px 10px; background:rgba(20,0,40,0.72); border:1px solid rgba(136,136,255,0.35); border-radius:10px; color:#dfe6ff; font-size:12px; line-height:1.4; z-index:1; box-shadow:0 0 12px rgba(0,200,255,0.18); pointer-events:none; }
     #fileWarning { position:fixed; inset:0; background:rgba(5,0,16,0.96); color:#fff; display:none; align-items:center; justify-content:center; text-align:left; padding:48px; box-sizing:border-box; z-index:10; }
     #fileWarning .box { max-width:720px; border:1px solid rgba(255,0,255,0.35); background:rgba(20,0,40,0.85); box-shadow:0 0 30px rgba(0,255,255,0.25); padding:28px; border-radius:12px; }
     #fileWarning h1 { margin-top:0; margin-bottom:12px; font-size:26px; color:#ff7bff; }
@@ -1131,6 +1131,8 @@ function onPointClick(point, event) {
     .pointRadius(p => Math.max(0.01, Math.min(0.5, p.radius || 0.05)))
     .onPointClick(onPointClick)
     (document.getElementById('globeViz'));
+  // Ensure taps/clicks register on mobile Safari.
+  globeInstance.enablePointerInteraction(true);
 
   const allPolys = [...(countriesGeo || []), ...(statesGeo || [])];
   if (allPolys.length) {
