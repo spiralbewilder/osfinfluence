@@ -985,10 +985,12 @@ function onPointClick(point, event) {
   if (!panel || !title || !content) return;
 
   try {
+    console.log('Point clicked:', point.loc || point.label || '');
     const fileWarning = document.getElementById('fileWarning');
     if (fileWarning) fileWarning.remove();
     panel.style.background = 'rgba(10,10,20,0.6)';
     panel.style.display = 'block';
+    panel.scrollTop = 0;
 
     const grants = point.grants || [];
     const hasAmount = typeof point.totalAmount === 'number';
