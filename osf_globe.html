@@ -12,7 +12,7 @@
     }
     body { margin:0; background:#000; overflow:hidden; font-family:'Inter', system-ui, -apple-system, sans-serif; color:#fff; }
     #bgLayer { position:fixed; inset:0; background:#0a0a0f; z-index:0; pointer-events:none; }
-    #globeViz { width:100vw; height:100vh; position:relative; z-index:1; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    #globeViz { width:100vw; height:100vh; position:relative; z-index:1; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:none; }
     #globeViz { width:100vw; height:100vh; }
     #panel { position:absolute; top:0; right:0; width:420px; height:100vh; background:rgba(10,10,20,0.6); color:#fff; padding:24px; box-sizing:border-box; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-left:2px solid rgba(255,0,255,0.35); display:none; box-shadow:none; backdrop-filter:blur(3px); z-index:1002; }
     #close { position:absolute; top:12px; left:12px; font-size:28px; cursor:pointer; color:var(--magenta); font-weight:bold; }
@@ -180,6 +180,7 @@ const MEDIA_PURPOSE_TOKENS = [/media/, /journalis/, /press/, /news/, /investigat
 
 const START_YEAR = 2020;
 const END_YEAR = 2023;
+const TOUCH_HOVER_TTL = 1800; // ms
 
 const SECTOR_RULES = [...PRIMARY_SECTOR_RULES, ...FALLBACK_SECTOR_RULES, { label: OTHER_LABEL, color: '#8888ff', regex: /.*/ }];
 
@@ -1142,7 +1143,7 @@ function onPointClick(point, event) {
   const globeCanvas = globeInstance.renderer().domElement;
   ['touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(evt => {
     globeCanvas.addEventListener(evt, () => {
-      if (lastHoveredPoint && Date.now() - lastHoverTime < 800) {
+      if (lastHoveredPoint && Date.now() - lastHoverTime < TOUCH_HOVER_TTL) {
         onPointClick(lastHoveredPoint);
       }
     }, { passive: true });
