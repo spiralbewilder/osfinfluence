@@ -1139,7 +1139,7 @@ function onPointClick(point, event) {
 
   // Fallback tap handler for touch devices: use the last hovered point on touchend/pointerup.
   const globeCanvas = globeInstance.renderer().domElement;
-  ['touchend', 'pointerup'].forEach(evt => {
+  ['touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(evt => {
     globeCanvas.addEventListener(evt, () => {
       if (lastHoveredPoint) onPointClick(lastHoveredPoint);
     }, { passive: true });
