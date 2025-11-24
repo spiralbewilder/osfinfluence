@@ -193,6 +193,7 @@ const sectorInputs = [];
 let sizeModeRadios = [];
 let lastHoveredPoint = null;
 let lastHoverTime = 0;
+let lastPointClickTime = 0;
 const geocodeLookup = new Map();
 let countriesGeo = [];
 let statesGeo = [];
@@ -1066,6 +1067,14 @@ function onPointClick(point, event) {
   }
 }
 
+function throttledPointClick(point, event) {
+  const now = Date.now();
+  if (!point) return;
+  if (now - lastPointClickTime < 250) return;
+  lastPointClickTime = now;
+  onPointClick(point, event);
+}
+
 (async function init() {
   console.log('Starting init');
   if (isFileProtocol) return;
@@ -1132,7 +1141,7 @@ function onPointClick(point, event) {
     .pointLabel('label')
     .pointAltitude(p => 0.00005 + Math.min(0.32, Math.pow(Math.max(p.radius || 0.02, 0.01), 1.8) * 0.9))
     .pointRadius(p => Math.max(0.01, Math.min(0.5, p.radius || 0.05)))
-    .onPointClick(onPointClick)
+    .onPointClick(throttledPointClick)
     .onPointHover((pt) => { lastHoveredPoint = pt; lastHoverTime = Date.now(); })
     (document.getElementById('globeViz'));
   // Ensure taps/clicks register on mobile Safari.
@@ -1143,7 +1152,7 @@ function onPointClick(point, event) {
   ['touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(evt => {
     globeCanvas.addEventListener(evt, () => {
       if (lastHoveredPoint && Date.now() - lastHoverTime < 800) {
-        onPointClick(lastHoveredPoint);
+        throttledPointClick(lastHoveredPoint);
       }
     }, { passive: true });
   });
